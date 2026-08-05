@@ -112,3 +112,28 @@ it('main() generate returns 1 without throwing when no config is present', async
   expect(code).toBe(1);
   expect(written(stderrSpy)).toContain('buildql: no config found');
 });
+
+it('generates a module bound to the configured client', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await copyFile(sdlPath, join(dir, 'schema.graphql'));
+  const out = await generate({ schema: './schema.graphql', output: '.', client: 'urql' }, dir);
+  const src = await readFile(out, 'utf8');
+  expect(src).toContain("import { toUrqlArgs, urqlDocument } from 'buildql/adapters/urql';");
+  expect(src).not.toContain('createClient');
+});
+
+it('tells the user which adapter names the generated module now re-exports', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await copyFile(sdlPath, join(dir, 'schema.graphql'));
+  await generate({ schema: './schema.graphql', output: '.', client: 'apollo' }, dir);
+  expect(written(stdoutSpy)).toMatch(
+    /buildql: client "apollo" — the generated module re-exports apolloDocument, toApolloMutation, toApolloQuery from buildql\/adapters\/apollo \(requires the "graphql" package\)/,
+  );
+});
+
+it('says nothing about adapters for the default client', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await copyFile(sdlPath, join(dir, 'schema.graphql'));
+  await generate({ schema: './schema.graphql', output: '.' }, dir);
+  expect(written(stdoutSpy)).not.toContain('buildql/adapters');
+});

@@ -201,4 +201,41 @@ describe('loadConfig', () => {
       loadConfig(dir, importModuleThrowingFor(tsPath, new Error('boom: DATABASE_URL is not set'))),
     ).rejects.toThrow(/boom: DATABASE_URL is not set/);
   });
+
+  it('accepts a valid client', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './schema.graphql', client: 'apollo' };\n",
+    );
+    const { config } = await loadConfig(dir);
+    expect(config.client).toBe('apollo');
+  });
+
+  it('leaves client undefined when it is not set', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+    const { config } = await loadConfig(dir);
+    expect(config.client).toBeUndefined();
+  });
+
+  it('errors clearly on an unknown client, naming the valid values', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './schema.graphql', client: 'relay' };\n",
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(
+      /buildql:.*"client" must be one of "buildql", "apollo", "urql", "none"/,
+    );
+  });
+
+  it('errors clearly when client is not a string', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './schema.graphql', client: 42 };\n",
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"client"/);
+  });
 });

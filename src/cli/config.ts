@@ -1,6 +1,10 @@
 import { access } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { isAbsolute, join, resolve } from 'node:path';
+import { CLIENT_KINDS, isClientKind } from '../codegen/clients.js';
+import type { ClientKind } from '../codegen/clients.js';
+
+export type { ClientKind } from '../codegen/clients.js';
 
 export interface BuildQLConfig {
   /** URL, path to an introspection .json, or path to an SDL file. */
@@ -11,6 +15,12 @@ export interface BuildQLConfig {
   readonly output?: string;
   /** Maps custom GraphQL scalars to TypeScript types, e.g. `{ DateTime: 'string' }`. */
   readonly scalars?: Record<string, string>;
+  /**
+   * Which GraphQL client the generated module binds to. `'buildql'` (the default) re-exports
+   * buildql's own `createClient`; `'apollo'` and `'urql'` re-export that client's adapter
+   * instead; `'none'` binds no client at all. Adapters require the `graphql` package.
+   */
+  readonly client?: ClientKind;
 }
 
 export function defineConfig(config: BuildQLConfig): BuildQLConfig {
@@ -81,6 +91,11 @@ function assertBuildQLConfig(
   }
   if (value.scalars !== undefined && !isStringRecord(value.scalars)) {
     throw new Error(`buildql: ${name}'s "scalars" must be a record of string values`);
+  }
+  if (value.client !== undefined && !isClientKind(value.client)) {
+    throw new Error(
+      `buildql: ${name}'s "client" must be one of ${CLIENT_KINDS.map((k) => `"${k}"`).join(', ')}`,
+    );
   }
 }
 
