@@ -48,8 +48,11 @@ export interface SpreadTarget {
 /** A fragment spread. Required `kind` discriminant makes Extract/Exclude work. */
 export interface Spread<R, V = {}> {
   readonly kind: 'spread';
-  readonly fragmentName: string;
-  /** The fragment being spread. Consumed by `collectFragments` and `collectVarRefs`. */
+  /**
+   * The fragment being spread. Consumed by `collectFragments` and `collectVarRefs`.
+   * Its `name` is the single source of truth for the fragment's printed name — there
+   * is deliberately no separate `fragmentName` field to keep in sync with it.
+   */
   readonly handle: SpreadTarget;
   readonly [RESULT]?: R;
   readonly [VARS]?: V;

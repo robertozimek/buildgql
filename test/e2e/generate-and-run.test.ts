@@ -38,7 +38,8 @@ beforeAll(async () => {
   usageFile = join(genDir, 'usage.ts');
   await writeFile(
     usageFile,
-    `import { query, mutation, on, Dog, Cat } from './index.js';
+    `import type { RESULT } from 'buildql';
+import { query, mutation, on, Dog, Cat } from './index.js';
 
 export const q = query('Posts', ($, Q) => [
   Q.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.firstName, A.lastName])]),
@@ -48,9 +49,21 @@ export const m = mutation('CreateNewUser', ($, M) => [
   M.createUser({ name: $.name, email: $.email }, (U) => [U.id, U.firstName]),
 ]);
 
+// \`P.__typename\` is selected alongside the \`on()\` inline fragments on purpose: this
+// is the C1 regression case. If the emitter ever again types a union's __typename as
+// its own abstract name (e.g. 'Pet') instead of the union of its possible types
+// ('Dog' | 'Cat'), \`Selected\` collapses this whole branch to \`never\` and the
+// assertion below fails to compile under the strict \`tsc\` run in the first test.
 export const p = query('Pet', ($, Q) => [
-  Q.pet((P) => [on('Dog', Dog, (D) => [D.breed]), on('Cat', Cat, (C) => [C.lives])]),
+  Q.pet((P) => [P.__typename, on('Dog', Dog, (D) => [D.breed]), on('Cat', Cat, (C) => [C.lives])]),
 ]);
+
+type Expect<T extends true> = T;
+type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type PetSelected = NonNullable<(typeof p)[typeof RESULT]>['pet'];
+export type _PetDiscriminates = Expect<
+  Eq<PetSelected, { __typename: 'Dog'; breed: string } | { __typename: 'Cat'; lives: number }>
+>;
 
 // Inline enum literal argument — the emitted document must contain \`status: PUBLISHED\`
 // unquoted, proving the Task 15 enum-arg codegen works end-to-end against a real server.
@@ -118,7 +131,13 @@ it('executes generated operations against the real server, including an unquoted
   const created = await client.execute(mod.m, { name: 'John Smith', email: 'john@smith.com' });
   expect(created).toEqual({ createUser: { id: 'u2', firstName: 'John Smith' } });
 
-  expect(await client.execute(mod.p)).toEqual({ pet: { __typename: 'Dog', breed: 'Corgi' } });
+  const petResult = await client.execute(mod.p);
+  expect(petResult).toEqual({ pet: { __typename: 'Dog', breed: 'Corgi' } });
+  // Runtime narrowing proof to match the compile-time one in usage.ts: `__typename`
+  // must actually work as a discriminant on the value the server returned, not just
+  // in the type system.
+  const pet = petResult.pet;
+  expect(pet.__typename === 'Dog' ? pet.breed : `not a Dog: ${pet.__typename}`).toBe('Corgi');
 
   // The enum literal proof: the printed document carries the bare enum name, not a
   // quoted string, and the server accepts it and returns the filtered result.

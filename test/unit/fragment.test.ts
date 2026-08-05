@@ -47,3 +47,20 @@ it('hoists a variable used only inside a spread fragment into the operation sign
     'query Users($size: Int!) { users { ...Bits } } fragment Bits on User { avatar(size: $size) }',
   );
 });
+
+it('throws when two distinct fragments share a name', () => {
+  const Same1 = userFragment('Same', (U) => [U.id]);
+  const Same2 = userFragment('Same', (U) => [U.firstName]);
+  expect(() =>
+    query('Both', ($, Q) => [Q.users((U) => [spread(Same1)]), Q.users.as('again')((U) => [spread(Same2)])]),
+  ).toThrow(/buildql: two different fragments are both named "Same"/);
+});
+
+it('reusing the same fragment handle twice does not throw and emits one definition', () => {
+  const Bits = userFragment('Bits', (U) => [U.firstName]);
+  let q!: ReturnType<typeof query>;
+  expect(() => {
+    q = query('Users', ($, Q) => [Q.users((U) => [spread(Bits)]), Q.users.as('again')((U) => [spread(Bits)])]);
+  }).not.toThrow();
+  expect(q.document.match(/fragment Bits on User/g)).toHaveLength(1);
+});

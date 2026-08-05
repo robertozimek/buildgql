@@ -112,9 +112,25 @@ function emitInput(t: IRType, ir: IRSchema): string {
   return `export interface ${t.name} {\n${fields}\n}\n`;
 }
 
+/**
+ * The TS type of `__typename` for a type map. A union or interface can resolve to
+ * one of several `possibleTypes` at runtime, so it must be typed as their union —
+ * typing it as the abstract type's own name (e.g. `'Pet'`, a value the server never
+ * actually sends) makes `__typename` collide with every `on()` branch's literal and
+ * collapses the field to `never` wherever the two are intersected (see `Selected`
+ * in `src/types/select.ts`). Concrete object types keep their own single literal name.
+ */
+function typenameTsType(t: IRType): string {
+  if (t.kind === 'union' || t.kind === 'interface') {
+    if (t.possibleTypes.length === 0) return 'string';
+    return t.possibleTypes.map((p) => `'${p}'`).join(' | ');
+  }
+  return `'${t.name}'`;
+}
+
 function emitTypeMap(t: IRType, ir: IRSchema): string {
   const body = t.fields.map((f) => emitField(f, ir)).join('\n');
-  const typename = `  __typename: leaf<'__typename', ['!'], '${t.name}'>('__typename', ['!']),`;
+  const typename = `  __typename: leaf<'__typename', ['!'], ${typenameTsType(t)}>('__typename', ['!']),`;
   return `export const ${t.name} = {\n${typename}\n${body}\n};\n`;
 }
 

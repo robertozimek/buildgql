@@ -122,4 +122,85 @@ describe('emit', () => {
     const src = emit(schema);
     expect(src).toContain("args<{ status: Status }>({ status: 'Status!' }, ['status'])");
   });
+
+  it('types a union/interface __typename as the union of its possible types, not its own name', () => {
+    // Built by hand so the union case is isolated: `possibleTypes` is what
+    // `buildIR` already computes from introspection but the emitter used to ignore,
+    // instead stamping the abstract type's own name — which collapses `Selected`
+    // to `never` wherever `__typename` is selected alongside `on()` branches.
+    const schema: IRSchema = {
+      queryType: 'Query',
+      mutationType: null,
+      subscriptionType: null,
+      scalars: DEFAULT_SCALARS,
+      types: [
+        {
+          name: 'Query',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'pet',
+              type: { wrap: ['!'], name: 'Pet', kind: 'union' },
+              gqlType: 'Pet!',
+              description: null,
+              deprecated: null,
+              args: [],
+            },
+          ],
+        },
+        {
+          name: 'Pet',
+          kind: 'union',
+          description: null,
+          possibleTypes: ['Dog', 'Cat'],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [],
+        },
+        {
+          name: 'Node',
+          kind: 'interface',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [],
+        },
+        {
+          name: 'Dog',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'breed',
+              type: { wrap: ['!'], name: 'String', kind: 'scalar' },
+              gqlType: 'String!',
+              description: null,
+              deprecated: null,
+              args: [],
+            },
+          ],
+        },
+      ],
+    };
+    const src = emit(schema);
+    // The union carries the union of its possible types...
+    expect(src).toContain("__typename: leaf<'__typename', ['!'], 'Dog' | 'Cat'>('__typename', ['!'])");
+    // ...an interface with no known possible types falls back to `string` rather
+    // than the abstract type's own unreturnable name...
+    expect(src).toContain("__typename: leaf<'__typename', ['!'], string>('__typename', ['!'])");
+    // ...and a concrete object type still gets its own single literal name.
+    expect(src).toContain("__typename: leaf<'__typename', ['!'], 'Dog'>('__typename', ['!'])");
+  });
 });

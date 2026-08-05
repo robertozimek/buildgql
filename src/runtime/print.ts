@@ -1,10 +1,7 @@
-import type { AnySel, DirectiveNode, Node, On, Spread, VarRef } from '../types/node.js';
+import type { AnySel, DirectiveNode, Node, On, Spread, SpreadTarget, VarRef } from '../types/node.js';
 
-export interface FragmentDef {
-  readonly name: string;
-  readonly typeCondition: string;
-  readonly sels: readonly Node[];
-}
+/** Identical in shape to `SpreadTarget` — a fragment definition is exactly what a spread points at. */
+export type FragmentDef = SpreadTarget;
 
 interface VarRefMarker {
   readonly __varRef: string;
@@ -51,7 +48,7 @@ function printDirectives(ds: readonly DirectiveNode[] | undefined): string {
 }
 
 function printNode(n: Node): string {
-  if (n.kind === 'spread') return `...${(n as Spread<unknown>).fragmentName}`;
+  if (n.kind === 'spread') return `...${(n as Spread<unknown>).handle.name}`;
   if (n.kind === 'on') {
     const o = n as On<string, unknown>;
     return `... on ${o.typename} ${printSels(o.sels)}`;
