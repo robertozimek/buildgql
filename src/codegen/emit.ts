@@ -134,6 +134,20 @@ function emitTypeMap(t: IRType, ir: IRSchema): string {
   return `export const ${t.name} = {\n${typename}\n${body}\n};\n`;
 }
 
+/**
+ * Every custom scalar in the schema with no entry in `ir.scalars` — these fall back
+ * to `UNKNOWN_SCALAR` (`unknown`) in the generated output, which silently drops all
+ * type safety for that field (and, in argument position, all argument checking). The
+ * CLI surfaces this list as a warning so the degradation is loud rather than silent.
+ */
+export function unmappedScalars(ir: IRSchema): string[] {
+  const names = new Set<string>();
+  for (const t of ir.types) {
+    if (t.kind === 'scalar' && !(t.name in ir.scalars)) names.add(t.name);
+  }
+  return [...names].sort();
+}
+
 export function emit(ir: IRSchema): string {
   const parts: string[] = [HEADER, IMPORTS];
 

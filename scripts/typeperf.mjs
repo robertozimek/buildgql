@@ -40,7 +40,7 @@ if (!Number.isFinite(instantiations) || instantiations > BUDGET_INSTANTIATIONS) 
   console.error('buildql: type instantiation budget exceeded');
   process.exit(1);
 }
-if (checkTime > BUDGET_CHECK_SECONDS) {
+if (!Number.isFinite(checkTime) || checkTime > BUDGET_CHECK_SECONDS) {
   console.error('buildql: type check time budget exceeded');
   process.exit(1);
 }

@@ -95,7 +95,16 @@ async function introspectUrl(url: string, opts: LoadOptions): Promise<Introspect
   if (!res.ok) {
     throw new Error(`buildql: introspection of ${url} failed with HTTP ${res.status}`);
   }
-  const payload = (await res.json()) as { data?: IntrospectionResult; errors?: { message: string }[] };
+  // Read the body ONCE as text and parse it by hand — a proxy or misconfigured server
+  // can return an HTML error page with a 200 status, and calling `res.json()` directly
+  // would surface that as a raw, unhelpful `SyntaxError` instead of a clear message.
+  const raw = await res.text();
+  let payload: { data?: IntrospectionResult; errors?: { message: string }[] };
+  try {
+    payload = JSON.parse(raw) as { data?: IntrospectionResult; errors?: { message: string }[] };
+  } catch {
+    throw new Error(`buildql: introspection of ${url} did not return valid JSON: ${raw.slice(0, 200)}`);
+  }
   if (payload.errors && payload.errors.length > 0) {
     throw new Error(`buildql: introspection of ${url} failed: ${payload.errors.map((e) => e.message).join('; ')}`);
   }

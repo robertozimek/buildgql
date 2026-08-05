@@ -1,4 +1,4 @@
-import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
+import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/client.js';
 
@@ -20,6 +20,16 @@ const client = createClient({ url: 'http://localhost/graphql' });
 
 const m = mutation('CreateNewUser', ($, M) => [M.createUser({ name: $.name, email: $.email }, (U) => [U.id])]);
 const q = query('Users', ($, Q) => [Q.users((U) => [U.id, U.lastName])]);
+
+// A query whose only variable comes from an OPTIONAL argument. `HasVars` must key off
+// required variables only — otherwise this all-optional case would wrongly force a
+// positional `vars` argument on `execute`/`subscribe` (regression guard for the
+// `keyof V extends never` version of `HasVars`, which can't distinguish `{ note?: T }`
+// from `{ note: T }`).
+const optionalOnlyQuery = makeQuery({
+  echo: leafArgs<'echo', ['!'], string, { note?: string }>('echo', ['!'], args<{ note?: string }>({ note: 'String' })),
+})('Echo', ($, Q) => [Q.echo({ note: $.note })]);
+const optionalClient = createClient({ url: 'http://localhost/graphql' });
 
 async function main() {
   const r = await client.execute(m, { name: 'John Smith', email: 'john@smith.com' });
@@ -46,7 +56,13 @@ async function main() {
   // @ts-expect-error missing required variable
   await client.execute(m, preDeclared);
 
-  return { id, bio };
+  // An all-optional variable map must NOT force a positional `vars` argument.
+  const r3 = await optionalClient.execute(optionalOnlyQuery);
+  const echoed: string = r3.echo;
+  // ...but a caller who wants to pass one still can.
+  const r4 = await optionalClient.execute(optionalOnlyQuery, { note: 'hi' });
+
+  return { id, bio, echoed, r4 };
 }
 
 export { main };

@@ -77,21 +77,41 @@ function assertBuildQLConfig(
   }
 }
 
-export async function loadConfig(cwd: string = process.cwd()): Promise<{ config: BuildQLConfig; path: string }> {
+/** Loads an ES module given its `file:` URL. Overridable in tests only — see `loadConfig`. */
+export type ConfigImporter = (url: string) => Promise<unknown>;
+
+const defaultImporter: ConfigImporter = (url) => import(url);
+
+export async function loadConfig(
+  cwd: string = process.cwd(),
+  // Exposed purely as a test seam: exercising the "this Node can't load a `.ts`
+  // config" fallthrough for real requires an actual Node import to reject with a
+  // native `SyntaxError`/`ERR_UNKNOWN_FILE_EXTENSION`, which a TypeScript-aware test
+  // runner's own transform (unlike plain Node) won't reproduce. Production code never
+  // passes this — `cli/index.ts` calls `loadConfig(cwd)` — so real dynamic `import()`
+  // is always what actually resolves a config file outside of tests.
+  importModule: ConfigImporter = defaultImporter,
+): Promise<{ config: BuildQLConfig; path: string }> {
+  // When a `.ts`/`.mts` candidate exists but fails to load specifically because this
+  // Node lacks native TypeScript support, that candidate is skipped rather than
+  // treated as fatal — a project that also ships a working `buildql.config.mjs` (or
+  // `.js`) must still work on Node 20. The message is remembered so it can still be
+  // shown if nothing else loads either.
+  let missingTypeStrippingMessage: string | undefined;
+
   for (const name of CANDIDATES) {
     const path = join(cwd, name);
     if (!(await exists(path))) continue;
 
     let mod: unknown;
     try {
-      mod = await import(pathToFileURL(path).href);
+      mod = await importModule(pathToFileURL(path).href);
     } catch (err) {
       if ((name.endsWith('.ts') || name.endsWith('.mts')) && isMissingTypeStrippingSupport(err)) {
-        throw new Error(
-          `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
-            `(Node >= 22.6 with --experimental-strip-types, or Node >= 23.6). ` +
-            `Otherwise rename it to buildql.config.mjs. Original error: ${errorMessage(err)}`,
-        );
+        missingTypeStrippingMessage = `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
+          `(Node >= 22.6 with --experimental-strip-types, or Node >= 23.6). ` +
+          `Otherwise rename it to buildql.config.mjs. Original error: ${errorMessage(err)}`;
+        continue;
       }
       throw new Error(`buildql: failed to load ${name}: ${errorMessage(err)}`);
     }
@@ -105,6 +125,9 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<{ config:
     }
     assertBuildQLConfig(name, config);
     return { config, path };
+  }
+  if (missingTypeStrippingMessage) {
+    throw new Error(missingTypeStrippingMessage);
   }
   throw new Error(
     `buildql: no config found in ${cwd}. Create a buildql.config.ts (or .js) exporting ` +

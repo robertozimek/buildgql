@@ -4,6 +4,9 @@ import type { GraphQLFormattedError } from './errors.js';
 import type { SubscriptionTransport } from './subscribe.js';
 
 export { sseTransport, wsTransport } from './subscribe.js';
+export { BuildQLHttpError, GraphQLResponseError } from './errors.js';
+export type { GraphQLFormattedError } from './errors.js';
+export type { SseTransportOptions, StreamChunk, SubscriptionTransport, WsTransportOptions } from './subscribe.js';
 
 export interface ClientOptions {
   readonly url: string;
@@ -17,8 +20,12 @@ export interface ExecuteOptions {
   readonly headers?: HeadersInit;
 }
 
-/** True when the operation declared at least one variable. */
-type HasVars<V> = keyof V extends never ? false : true;
+/** Keys of `V` that are not optional. */
+type RequiredKeys<V> = { [K in keyof V]-?: {} extends Pick<V, K> ? never : K }[keyof V];
+
+/** True when the operation declared at least one REQUIRED variable — an all-optional
+ *  variable map (e.g. `{ after?: string }`) must not force a positional `vars` argument. */
+type HasVars<V> = RequiredKeys<V> extends never ? false : true;
 type VarArgs<V> = HasVars<V> extends true ? [vars: NoInfer<V>, opts?: ExecuteOptions] : [vars?: NoInfer<V>, opts?: ExecuteOptions];
 
 interface RawResponse {
@@ -101,7 +108,17 @@ export function createClient(options: ClientOptions): Client {
       };
       return {
         async *[Symbol.asyncIterator]() {
-          for await (const chunk of transport.subscribe(payload, controller.signal)) {
+          // Deliberately NOT routed through the shared `resolveHeaders` helper: calling
+          // an `async function` always returns a Promise, and `await`-ing it — even when
+          // the value is already resolved — always defers by a microtask. Some transports
+          // (`wsTransport`) construct their connection synchronously as part of this same
+          // turn, so an unconditional `await` here would delay that connection by a tick
+          // for every subscription, not just ones with a headers function to resolve.
+          const headers = new Headers(
+            typeof options.headers === 'function' ? await options.headers() : (options.headers ?? {}),
+          );
+          for (const [k, val] of new Headers(opts?.headers ?? {})) headers.set(k, val);
+          for await (const chunk of transport.subscribe(payload, controller.signal, headers)) {
             if (chunk.errors && chunk.errors.length > 0) {
               throw new GraphQLResponseError(chunk.errors, chunk.data);
             }

@@ -47,6 +47,31 @@ it('applies scalar overrides from config', async () => {
   expect(await readFile(out, 'utf8')).toContain("leaf<'id', ['!'], MyId>");
 });
 
+it('warns by name about a custom scalar with no entry in "scalars"', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await writeFile(
+    join(dir, 'schema.graphql'),
+    'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n',
+  );
+
+  await generate({ schema: './schema.graphql' }, dir);
+
+  expect(written(stderrSpy)).toContain('buildql: unmapped custom scalar');
+  expect(written(stderrSpy)).toContain('DateTime');
+});
+
+it('does not warn once the scalar is mapped in config', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await writeFile(
+    join(dir, 'schema.graphql'),
+    'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n',
+  );
+
+  await generate({ schema: './schema.graphql', scalars: { DateTime: 'string' } }, dir);
+
+  expect(written(stderrSpy)).not.toContain('unmapped custom scalar');
+});
+
 it('main() with no args returns 1 and prints usage', async () => {
   const code = await main([]);
   expect(code).toBe(1);

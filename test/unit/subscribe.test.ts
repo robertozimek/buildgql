@@ -4,6 +4,7 @@ import { makeSubscription } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/client.js';
 import { sseTransport, wsTransport } from '../../src/client/subscribe.js';
 import type { SubscriptionTransport } from '../../src/client/subscribe.js';
+import { BuildQLHttpError } from '../../src/client/errors.js';
 
 const Msg = { id: leaf<'id', ['!'], string>('id', ['!']) };
 const subscription = makeSubscription({ messages: object('messages', ['!'], Msg) });
@@ -287,6 +288,50 @@ it('yields a queued `next` value even when `complete` arrives in the same turn, 
 
   await expect(first).resolves.toEqual({ value: { messages: { id: '1' } }, done: false });
   await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+});
+
+it('threads per-subscription headers to the transport, merged with (and overriding) client-level headers', async () => {
+  const seenHeaders: Headers[] = [];
+  const transport: SubscriptionTransport = {
+    async *subscribe(_payload, _signal, headers) {
+      seenHeaders.push(new Headers(headers ?? {}));
+    },
+  };
+  const client = createClient({
+    url: 'http://x/graphql',
+    headers: { 'x-client-only': 'client', 'x-both': 'client' },
+    subscriptions: transport,
+  });
+
+  for await (const _chunk of client.subscribe(s, undefined, {
+    headers: { 'x-sub-only': 'sub', 'x-both': 'sub' },
+  })) {
+    /* nothing yielded by this transport */
+  }
+
+  expect(seenHeaders).toHaveLength(1);
+  expect(seenHeaders[0]?.get('x-client-only')).toBe('client');
+  expect(seenHeaders[0]?.get('x-sub-only')).toBe('sub');
+  // Per-subscription headers win over client-level ones for the same key.
+  expect(seenHeaders[0]?.get('x-both')).toBe('sub');
+});
+
+it('throws BuildQLHttpError (not a bare Error) when the SSE handshake fails with a non-2xx status', async () => {
+  const fetchMock = vi.fn<typeof fetch>(async () => new Response('nope', { status: 503 }));
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: sseTransport({ url: 'http://x/graphql', fetch: fetchMock }),
+  });
+
+  const drain = async () => {
+    for await (const _chunk of client.subscribe(s)) {
+      /* nothing should ever be yielded */
+    }
+  };
+  const err = await drain().catch((e: unknown) => e);
+  expect(err).toBeInstanceOf(BuildQLHttpError);
+  expect((err as BuildQLHttpError).status).toBe(503);
+  expect((err as BuildQLHttpError).body).toBe('nope');
 });
 
 it('aborts the transport signal immediately when the caller signal is already aborted', async () => {
