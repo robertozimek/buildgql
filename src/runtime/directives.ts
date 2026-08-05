@@ -23,10 +23,26 @@ function applyDirective<N extends string, R, V, Name extends string>(
     }
     directive = { name, if: { varName, gqlType: 'Boolean!' } };
   }
-  const next = { ...(sel as object), directives: [...((sel as { directives?: DirectiveNode[] }).directives ?? []), directive] };
+  const next = { ...sel, directives: [...(sel.directives ?? []), directive] };
+  // Attaches the phantom `R`/`V`/`O` parameters to the spread runtime object —
+  // `Sel`'s type-level fields carry no runtime representation, so the widened
+  // return type cannot be derived structurally from `next` alone.
   return next as unknown as Sel<N, R, V & { [P in Name]: boolean }, true>;
 }
 
+/**
+ * `include`/`skip` MUST be overloaded, not declared with a single
+ * `cond: boolean | VarMarker<Name>` parameter. With the union form, a literal
+ * `true` leaves `Name` unconstrained, so TypeScript falls back to its constraint
+ * and infers `Name = string`. `{ [P in string]: boolean }` is an *index
+ * signature*, which then intersects into the operation's variables type and makes
+ * the whole operation untypeable by its caller.
+ */
+export function include<N extends string, R, V>(sel: Sel<N, R, V, boolean>, cond: boolean): Sel<N, R, V, true>;
+export function include<N extends string, R, V, Name extends string>(
+  sel: Sel<N, R, V, boolean>,
+  cond: VarMarker<Name>,
+): Sel<N, R, V & { [P in Name]: boolean }, true>;
 /** Include this field only when the condition is true. Makes the result field optional. */
 export function include<N extends string, R, V, Name extends string>(
   sel: Sel<N, R, V, boolean>,
@@ -35,6 +51,11 @@ export function include<N extends string, R, V, Name extends string>(
   return applyDirective(sel, 'include', cond);
 }
 
+export function skip<N extends string, R, V>(sel: Sel<N, R, V, boolean>, cond: boolean): Sel<N, R, V, true>;
+export function skip<N extends string, R, V, Name extends string>(
+  sel: Sel<N, R, V, boolean>,
+  cond: VarMarker<Name>,
+): Sel<N, R, V & { [P in Name]: boolean }, true>;
 /** Skip this field when the condition is true. Makes the result field optional. */
 export function skip<N extends string, R, V, Name extends string>(
   sel: Sel<N, R, V, boolean>,
