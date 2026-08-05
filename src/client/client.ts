@@ -1,4 +1,5 @@
 import type { Operation } from '../runtime/operation.js';
+import type { HasVars } from '../types/varargs.js';
 import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 import type { SubscriptionTransport } from './subscribe.js';
@@ -20,12 +21,6 @@ export interface ExecuteOptions {
   readonly headers?: HeadersInit;
 }
 
-/** Keys of `V` that are not optional. */
-type RequiredKeys<V> = { [K in keyof V]-?: {} extends Pick<V, K> ? never : K }[keyof V];
-
-/** True when the operation declared at least one REQUIRED variable — an all-optional
- *  variable map (e.g. `{ after?: string }`) must not force a positional `vars` argument. */
-type HasVars<V> = RequiredKeys<V> extends never ? false : true;
 type VarArgs<V> = HasVars<V> extends true ? [vars: NoInfer<V>, opts?: ExecuteOptions] : [vars?: NoInfer<V>, opts?: ExecuteOptions];
 
 interface RawResponse {
