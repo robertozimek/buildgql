@@ -1,0 +1,35 @@
+{
+  "name": "buildql",
+  "version": "0.0.0",
+  "description": "Type-safe GraphQL query builder generated from introspection",
+  "license": "MIT",
+  "type": "module",
+  "bin": { "buildql": "./dist/cli/index.js" },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
+    "./client": { "types": "./dist/client/client.d.ts", "import": "./dist/client/client.js", "require": "./dist/client/client.cjs" },
+    "./config": { "types": "./dist/cli/config.d.ts", "import": "./dist/cli/config.js", "require": "./dist/cli/config.cjs" }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:types": "tsc -p tsconfig.typetest.json",
+    "check": "npm run test:types && npm run test"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.4",
+    "graphql": ">=16"
+  },
+  "peerDependenciesMeta": {
+    "graphql": { "optional": true }
+  },
+  "engines": { "node": ">=18" },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "graphql": "^16.14.2",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9"
+  }
+}
