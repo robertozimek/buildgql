@@ -1,4 +1,4 @@
-import type { ArgsInput, VarMarker, VarProxy, VarsOf } from '../../src/types/vars.js';
+import type { ArgSpec, ArgsInput, VarMarker, VarProxy, VarsOf } from '../../src/types/vars.js';
 import type { Simplify } from '../../src/types/util.js';
 
 type Expect<T extends true> = T;
@@ -31,3 +31,14 @@ type _6 = Expect<Eq<typeof $.name, VarMarker>>;
 declare const ok: ArgsInput<Spec>;
 const a: typeof ok = { name: 'x', email: $.email, age: 3 };
 export { a };
+
+// 8. no args at all must resolve to `{}`, never `unknown` (regression guard for
+// `UnionToIntersection<never>` leaking `unknown` through `VarsOf`)
+type _8 = Expect<Eq<VarsOf<{}, Spec>, {}>>;
+
+// 9. ArgSpec accepts a `gql` record of GraphQL type strings, and its phantom
+// `__t` carries the argument type through
+declare const spec: ArgSpec<{ name: string }>;
+const g: typeof spec.gql = { name: 'String!' };
+export { g };
+type _9 = Expect<Eq<NonNullable<ArgSpec<{ name: string }>['__t']>, { name: string }>>;

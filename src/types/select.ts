@@ -47,20 +47,12 @@ export type Selected<S extends readonly Node[]> = [OnBranches<S>] extends [never
 
 /**
  * Union of every variable map contributed anywhere in a selection tuple.
- * The `unknown extends R` branch normalises the empty-selection case: with no
- * `Node`s to intersect, `UnionToIntersection<never>` resolves to `unknown`, so
- * we map that back to `{}`.
  */
-export type VarsIn<S extends readonly Node[]> =
-  UnionToIntersection<
-    {
-      [I in keyof S]: S[I] extends { readonly [VARS]?: infer V } ? (V extends undefined ? {} : V) : {};
-    }[number]
-  > extends infer R
-    ? unknown extends R
-      ? {}
-      : R
-    : never;
+export type VarsIn<S extends readonly Node[]> = UnionToIntersection<
+  {
+    [I in keyof S]: S[I] extends { readonly [VARS]?: infer V } ? (V extends undefined ? {} : V) : {};
+  }[number]
+>;
 
 export type { KeyOf, PlainFields, SpreadFields, OnBranches };
 export type { AnySel, Node, On, Sel, Spread, KEY, RESULT, VARS };

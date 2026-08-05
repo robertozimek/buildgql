@@ -50,4 +50,6 @@ export type VarsOf<A, Spec> = UnionToIntersection<
  */
 export type VarProxy = { readonly [K in string]: VarMarker };
 
-export type { IsOpt, VarEntry };
+// `IsOpt` and `VarEntry` stay file-local: they are composition helpers for
+// `VarsOf` with no consumer elsewhere, and exporting them would put untested
+// types on the public API surface.
