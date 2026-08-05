@@ -73,7 +73,7 @@ export function collectVarRefs(sels: readonly Node[]): VarRef[] {
         continue;
       }
       if (n.kind === 'spread') {
-        walk((n as unknown as { handle: { sels: readonly Node[] } }).handle.sels);
+        walk(n.handle.sels);
         continue;
       }
       const s = n as AnySel;
