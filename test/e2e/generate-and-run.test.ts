@@ -38,7 +38,7 @@ beforeAll(async () => {
   usageFile = join(genDir, 'usage.ts');
   await writeFile(
     usageFile,
-    `import { query, mutation, Query, Mutation, $, on, Dog, Cat } from './index.js';
+    `import { query, mutation, on, Dog, Cat } from './index.js';
 
 export const q = query('Posts', ($, Q) => [
   Q.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.firstName, A.lastName])]),
