@@ -38,15 +38,27 @@ function wrapLiteral(wrap: readonly ('l' | '!')[]): string {
   return `[${wrap.map((w) => `'${w}'`).join(', ')}]`;
 }
 
+/**
+ * Looks up a scalar's mapped TS type by *own* property only. A plain `map[name]` (or
+ * `name in map`) walks the prototype chain, so a schema scalar legitimately named
+ * `toString`, `valueOf`, or `constructor` would resolve to the inherited
+ * `Object.prototype` member instead of `undefined` — silently treating it as "mapped"
+ * and splicing e.g. `Object.prototype.toString` into the generated source. `ir.scalars`
+ * is also built with a null prototype (see `buildIR`) as defense in depth.
+ */
+function scalarTsType(ir: IRSchema, name: string): string | undefined {
+  return Object.hasOwn(ir.scalars, name) ? ir.scalars[name] : undefined;
+}
+
 /** The TypeScript type a *leaf* (scalar/enum) named type maps to. */
 function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
   if (ref.kind === 'enum') return ref.name;
-  return ir.scalars[ref.name] ?? UNKNOWN_SCALAR;
+  return scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR;
 }
 
 /** The TypeScript type of an *input* position, wrappers included. */
 function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
-  const base = ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (ir.scalars[ref.name] ?? UNKNOWN_SCALAR);
+  const base = ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
   let out = base;
   const toks = [...ref.wrap].reverse();
@@ -143,7 +155,7 @@ function emitTypeMap(t: IRType, ir: IRSchema): string {
 export function unmappedScalars(ir: IRSchema): string[] {
   const names = new Set<string>();
   for (const t of ir.types) {
-    if (t.kind === 'scalar' && !(t.name in ir.scalars)) names.add(t.name);
+    if (t.kind === 'scalar' && !Object.hasOwn(ir.scalars, t.name)) names.add(t.name);
   }
   return [...names].sort();
 }

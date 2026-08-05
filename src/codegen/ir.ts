@@ -132,6 +132,10 @@ export function buildIR(
     mutationType: schema.__schema.mutationType?.name ?? null,
     subscriptionType: schema.__schema.subscriptionType?.name ?? null,
     types,
-    scalars: { ...DEFAULT_SCALARS, ...scalarOverrides },
+    // A null-prototype target means a scalar legitimately named `toString`, `valueOf`,
+    // or `constructor` cannot resolve to an inherited `Object.prototype` member on
+    // either an `in`/`Object.hasOwn` membership check or a plain bracket read — there
+    // is no prototype chain left to walk.
+    scalars: Object.assign(Object.create(null) as Record<string, string>, DEFAULT_SCALARS, scalarOverrides),
   };
 }
