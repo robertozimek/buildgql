@@ -15,7 +15,8 @@
     "build": "tsup",
     "test": "vitest run",
     "test:types": "tsc -p tsconfig.typetest.json",
-    "check": "npm run test:types && npm run test"
+    "test:perf": "node scripts/typeperf.mjs",
+    "check": "npm run test:types && npm run test && npm run test:perf"
   },
   "peerDependencies": {
     "typescript": ">=5.4",

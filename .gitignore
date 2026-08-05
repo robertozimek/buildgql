@@ -2,3 +2,5 @@ node_modules
 dist
 .idea/
 *.bak
+test/perf/generated.ts
+test/perf/tsconfig.json
