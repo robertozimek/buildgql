@@ -1,0 +1,76 @@
+import type { Operation } from '../runtime/operation.js';
+import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
+import type { GraphQLFormattedError } from './errors.js';
+
+export interface ClientOptions {
+  readonly url: string;
+  readonly headers?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
+  readonly fetch?: typeof fetch;
+}
+
+export interface ExecuteOptions {
+  readonly signal?: AbortSignal;
+  readonly headers?: HeadersInit;
+}
+
+/** True when the operation declared at least one variable. */
+type HasVars<V> = keyof V extends never ? false : true;
+type VarArgs<V> = HasVars<V> extends true ? [vars: NoInfer<V>, opts?: ExecuteOptions] : [vars?: NoInfer<V>, opts?: ExecuteOptions];
+
+interface RawResponse {
+  data?: unknown;
+  errors?: readonly GraphQLFormattedError[];
+}
+
+export interface Client {
+  execute<R, V>(op: Operation<R, V>, ...rest: VarArgs<V>): Promise<R>;
+  readonly options: ClientOptions;
+}
+
+async function resolveHeaders(h: ClientOptions['headers']): Promise<HeadersInit> {
+  if (!h) return {};
+  return typeof h === 'function' ? await h() : h;
+}
+
+export function createClient(options: ClientOptions): Client {
+  const doFetch = options.fetch ?? globalThis.fetch;
+  if (typeof doFetch !== 'function') {
+    throw new Error('buildql: no fetch implementation available — pass one via createClient({ fetch })');
+  }
+
+  return {
+    options,
+    async execute<R, V>(op: Operation<R, V>, ...rest: VarArgs<V>): Promise<R> {
+      const [vars, opts] = rest as [V | undefined, ExecuteOptions | undefined];
+      const headers = new Headers(await resolveHeaders(options.headers));
+      for (const [k, val] of new Headers(opts?.headers ?? {})) headers.set(k, val);
+      headers.set('content-type', 'application/json');
+      if (!headers.has('accept')) headers.set('accept', 'application/json');
+
+      const res = await doFetch(options.url, {
+        method: 'POST',
+        headers,
+        signal: opts?.signal,
+        body: JSON.stringify({
+          query: op.document,
+          operationName: op.name,
+          variables: vars ?? {},
+        }),
+      });
+
+      if (!res.ok) throw new BuildQLHttpError(res.status, await res.text().catch(() => ''));
+
+      let payload: RawResponse;
+      try {
+        payload = (await res.json()) as RawResponse;
+      } catch {
+        throw new BuildQLHttpError(res.status, await res.text().catch(() => ''));
+      }
+
+      if (payload.errors && payload.errors.length > 0) {
+        throw new GraphQLResponseError(payload.errors, payload.data);
+      }
+      return payload.data as R;
+    },
+  };
+}
