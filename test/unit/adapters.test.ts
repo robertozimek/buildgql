@@ -3,6 +3,7 @@ import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/buil
 import { makeMutation, makeQuery, makeSubscription } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
 import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
+import { toUrqlArgs, urqlDocument } from '../../src/adapters/urql.js';
 
 const User = {
   id: leaf<'id', ['!'], string>('id', ['!']),
@@ -100,5 +101,30 @@ describe('apollo adapter', () => {
     expect(() => toApolloQuery(CreateUser as never)).toThrow(
       /buildql: toApolloQuery\(\) expects a query or subscription operation, but "CreateUser" is a mutation/,
     );
+  });
+});
+
+describe('urql adapter', () => {
+  it('urqlDocument returns the shared, memoised AST', () => {
+    expect(urqlDocument(Users)).toBe(toDocument(Users));
+  });
+
+  it('toUrqlArgs produces useQuery() arguments', () => {
+    expect(toUrqlArgs(UserById, { id: '7' })).toEqual({
+      query: toDocument(UserById),
+      variables: { id: '7' },
+    });
+  });
+
+  it('defaults variables to an empty object', () => {
+    expect(toUrqlArgs(Users).variables).toEqual({});
+  });
+
+  it('accepts every operation kind, because urql keys all three off `query`', () => {
+    // Unlike Apollo, urql's useQuery/useMutation/useSubscription and the equivalent
+    // client methods all take the document under `query` — so there is nothing here that
+    // a kind guard could catch.
+    expect(toUrqlArgs(CreateUser, { name: 'Ada' }).query).toBe(toDocument(CreateUser));
+    expect(toUrqlArgs(Ticks).query).toBe(toDocument(Ticks));
   });
 });

@@ -3,6 +3,7 @@ import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
 import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
+import { toUrqlArgs, urqlDocument } from '../../src/adapters/urql.js';
 
 const User = {
   id: leaf<'id', ['!'], string>('id', ['!']),
@@ -79,3 +80,35 @@ async function apolloUsage() {
 }
 
 export { apolloUsage };
+
+// Mirrors urql's `Client#query`, `Client#mutation` and `useQuery` signatures. urql types
+// its document parameter as `DocumentInput<Data, Variables>`, which resolves to
+// `TypedDocumentNode<Data, Variables>` for a typed node — the case pinned here.
+declare function urqlClientQuery<TData, TVariables>(
+  query: CoreTypedDocumentNode<TData, TVariables>,
+  variables: TVariables,
+): Promise<{ data?: TData }>;
+declare function urqlUseQuery<TData, TVariables>(
+  args: { query: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
+): [{ data?: TData }];
+
+async function urqlUsage() {
+  const [res] = urqlUseQuery(toUrqlArgs(UserById, { id: '7' }));
+  const name: string | undefined = res.data?.user.firstName;
+
+  const direct = await urqlClientQuery(urqlDocument(UserById), { id: '7' });
+  const directName: string | undefined = direct.data?.user.firstName;
+
+  // @ts-expect-error missing required variable
+  toUrqlArgs(UserById);
+  // @ts-expect-error wrong variable type
+  toUrqlArgs(UserById, { id: 7 });
+  // @ts-expect-error unknown variable
+  toUrqlArgs(UserById, { id: '7', extra: true });
+
+  const none = toUrqlArgs(Users);
+
+  return { name, directName, none };
+}
+
+export { urqlUsage };
