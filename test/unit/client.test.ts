@@ -15,7 +15,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 describe('createClient', () => {
   it('POSTs the document and returns data', async () => {
     const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ data: { users: [{ id: '1' }] } }));
-    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as unknown as typeof fetch });
+    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock });
     const result = await client.execute(q);
     expect(result).toEqual({ users: [{ id: '1' }] });
 
@@ -33,7 +33,7 @@ describe('createClient', () => {
     const client = createClient({
       url: 'http://x/graphql',
       headers: () => ({ authorization: 'Bearer t' }),
-      fetch: fetchMock as unknown as typeof fetch,
+      fetch: fetchMock,
     });
     await client.execute(q);
     const init = fetchMock.mock.calls[0]![1] as RequestInit;
@@ -44,14 +44,26 @@ describe('createClient', () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({ data: null, errors: [{ message: 'boom', path: ['users'] }] }),
     );
-    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as unknown as typeof fetch });
+    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as typeof fetch });
     await expect(client.execute(q)).rejects.toBeInstanceOf(GraphQLResponseError);
     await expect(client.execute(q)).rejects.toThrow('boom');
   });
 
   it('throws BuildQLHttpError on a non-2xx response', async () => {
     const fetchMock = vi.fn(async () => new Response('nope', { status: 500 }));
-    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as unknown as typeof fetch });
+    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as typeof fetch });
     await expect(client.execute(q)).rejects.toBeInstanceOf(BuildQLHttpError);
+  });
+
+  it('throws BuildQLHttpError with the raw body on an unparseable 200 response', async () => {
+    const malformed = '{not valid json';
+    const fetchMock = vi.fn<typeof fetch>(
+      async () => new Response(malformed, { status: 200, headers: { 'content-type': 'application/json' } }),
+    );
+    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock });
+
+    const err = await client.execute(q).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(BuildQLHttpError);
+    expect((err as BuildQLHttpError).body).toBe(malformed);
   });
 });
