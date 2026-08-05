@@ -37,6 +37,16 @@
       "types": "./dist/cli/config.d.ts",
       "import": "./dist/cli/config.js",
       "require": "./dist/cli/config.cjs"
+    },
+    "./adapters/apollo": {
+      "types": "./dist/adapters/apollo.d.ts",
+      "import": "./dist/adapters/apollo.js",
+      "require": "./dist/adapters/apollo.cjs"
+    },
+    "./adapters/urql": {
+      "types": "./dist/adapters/urql.d.ts",
+      "import": "./dist/adapters/urql.js",
+      "require": "./dist/adapters/urql.cjs"
     }
   },
   "typesVersions": {
@@ -46,6 +56,12 @@
       ],
       "config": [
         "./dist/cli/config.d.ts"
+      ],
+      "adapters/apollo": [
+        "./dist/adapters/apollo.d.ts"
+      ],
+      "adapters/urql": [
+        "./dist/adapters/urql.d.ts"
       ]
     }
   },
