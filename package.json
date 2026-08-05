@@ -4,25 +4,54 @@
   "description": "Type-safe GraphQL query builder generated from introspection",
   "license": "MIT",
   "type": "module",
-  "keywords": ["graphql", "typescript", "codegen", "query-builder", "type-safe"],
-  "repository": { "type": "git", "url": "git+https://github.com/rozimek/buildql.git" },
+  "keywords": [
+    "graphql",
+    "typescript",
+    "codegen",
+    "query-builder",
+    "type-safe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rozimek/buildql.git"
+  },
   "sideEffects": false,
-  "bin": { "buildql": "./dist/cli/index.js" },
+  "bin": {
+    "buildql": "./dist/cli/index.js"
+  },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
-    "./client": { "types": "./dist/client/client.d.ts", "import": "./dist/client/client.js", "require": "./dist/client/client.cjs" },
-    "./config": { "types": "./dist/cli/config.d.ts", "import": "./dist/cli/config.js", "require": "./dist/cli/config.cjs" }
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./client": {
+      "types": "./dist/client/client.d.ts",
+      "import": "./dist/client/client.js",
+      "require": "./dist/client/client.cjs"
+    },
+    "./config": {
+      "types": "./dist/cli/config.d.ts",
+      "import": "./dist/cli/config.js",
+      "require": "./dist/cli/config.cjs"
+    }
   },
   "typesVersions": {
     "*": {
-      "client": ["./dist/client/client.d.ts"],
-      "config": ["./dist/cli/config.d.ts"]
+      "client": [
+        "./dist/client/client.d.ts"
+      ],
+      "config": [
+        "./dist/cli/config.d.ts"
+      ]
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
@@ -31,14 +60,19 @@
     "check": "npm run test:types && npm run test && npm run test:perf"
   },
   "peerDependencies": {
-    "typescript": ">=5.4",
-    "graphql": ">=16"
+    "graphql": ">=16",
+    "typescript": ">=5.4"
   },
   "peerDependenciesMeta": {
-    "graphql": { "optional": true }
+    "graphql": {
+      "optional": true
+    }
   },
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "devDependencies": {
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@types/node": "^20.19.43",
     "graphql": "^16.14.2",
     "graphql-yoga": "^5.21.2",
