@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery, makeSubscription } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
+import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
 
 const User = {
   id: leaf<'id', ['!'], string>('id', ['!']),
@@ -60,5 +61,44 @@ describe('toDocument', () => {
 
   it('returns distinct ASTs for distinct operations', () => {
     expect(toDocument(Users)).not.toBe(toDocument(UserById));
+  });
+});
+
+describe('apollo adapter', () => {
+  it('apolloDocument returns the shared, memoised AST', () => {
+    expect(apolloDocument(Users)).toBe(toDocument(Users));
+  });
+
+  it('toApolloQuery produces client.query() options', () => {
+    const opts = toApolloQuery(UserById, { id: '7' });
+    expect(opts).toEqual({ query: toDocument(UserById), variables: { id: '7' } });
+  });
+
+  it('defaults variables to an empty object when the operation declares none', () => {
+    // Matches `client.execute`, which also sends `variables: {}` rather than omitting
+    // the key — Apollo uses `variables` for cache keying, and `undefined` vs `{}` would
+    // make buildql's two client paths disagree about the same operation.
+    expect(toApolloQuery(Users).variables).toEqual({});
+  });
+
+  it('toApolloQuery accepts a subscription, since client.subscribe() also takes { query }', () => {
+    expect(toApolloQuery(Ticks, { room: 'lobby' }).query).toBe(toDocument(Ticks));
+  });
+
+  it('toApolloMutation produces client.mutate() options under the `mutation` key', () => {
+    const opts = toApolloMutation(CreateUser, { name: 'Ada' });
+    expect(opts).toEqual({ mutation: toDocument(CreateUser), variables: { name: 'Ada' } });
+  });
+
+  it('rejects a query passed to toApolloMutation', () => {
+    expect(() => toApolloMutation(Users as never)).toThrow(
+      /buildql: toApolloMutation\(\) expects a mutation operation, but "Users" is a query/,
+    );
+  });
+
+  it('rejects a mutation passed to toApolloQuery', () => {
+    expect(() => toApolloQuery(CreateUser as never)).toThrow(
+      /buildql: toApolloQuery\(\) expects a query or subscription operation, but "CreateUser" is a mutation/,
+    );
   });
 });

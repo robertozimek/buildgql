@@ -2,6 +2,7 @@ import type { TypedDocumentNode as CoreTypedDocumentNode } from '@graphql-typed-
 import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
+import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
 
 const User = {
   id: leaf<'id', ['!'], string>('id', ['!']),
@@ -37,3 +38,44 @@ const byIdName: string = byIdProbe[0].user.firstName;
 byIdProbe[0].user.lastName;
 
 export { userIds, byIdVar, byIdName };
+
+// Apollo's own types are not a devDependency (see the plan's design notes: they are heavy
+// and have restructured their entry points across majors). These mirror the public
+// signatures of `ApolloClient#query`, `#mutate` and `useQuery` closely enough to prove the
+// adapter's return values drop straight in; the phantom contract they all rely on is
+// tested for real against @graphql-typed-document-node/core above.
+declare function apolloQuery<TData, TVariables>(
+  options: { query: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
+): Promise<{ data: TData }>;
+declare function apolloMutate<TData, TVariables>(
+  options: { mutation: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
+): Promise<{ data: TData }>;
+declare function apolloUseQuery<TData, TVariables>(
+  document: CoreTypedDocumentNode<TData, TVariables>,
+  options?: { variables?: TVariables },
+): { data: TData | undefined };
+
+async function apolloUsage() {
+  const q = await apolloQuery(toApolloQuery(UserById, { id: '7' }));
+  const name: string = q.data.user.firstName;
+
+  const m = await apolloMutate(toApolloMutation(CreateUser, { name: 'Ada' }));
+  const created: string = m.data.createUser.id;
+
+  const hook = apolloUseQuery(apolloDocument(UserById), { variables: { id: '7' } });
+  const hookName: string | undefined = hook.data?.user.firstName;
+
+  // @ts-expect-error missing required variable
+  toApolloQuery(UserById);
+  // @ts-expect-error wrong variable type
+  toApolloQuery(UserById, { id: 7 });
+  // @ts-expect-error unknown variable
+  toApolloQuery(UserById, { id: '7', extra: true });
+
+  // An operation with no variables needs no second argument at all.
+  const none = toApolloQuery(Users);
+
+  return { name, created, hookName, none };
+}
+
+export { apolloUsage };
