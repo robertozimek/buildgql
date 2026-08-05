@@ -21,21 +21,32 @@ export function spread<R, V>(f: FragmentHandle<R, V>): Spread<R, V> {
   // Phantom attachment only: `handle: f` is the real runtime value already
   // shaped like `SpreadTarget`; the cast exists solely to stamp the `R`/`V`
   // type parameters onto the returned `Spread`.
-  return { kind: 'spread', fragmentName: f.name, handle: f } as unknown as Spread<R, V>;
+  return { kind: 'spread', handle: f } as unknown as Spread<R, V>;
 }
 
-/** Walks a selection tree collecting every reachable fragment, deduped by name. */
+/**
+ * Walks a selection tree collecting every reachable fragment, deduped by name.
+ * Two different fragment handles sharing a name is a conflict — printing would
+ * silently keep whichever one was discovered first while the *other* call site's
+ * inferred result type kept describing the fields it actually picked, producing a
+ * type that lies about what the server returns. Reusing the very same handle in two
+ * places is fine and must not throw, so handles are compared by identity, not name
+ * alone (mirrors `dedupeVarRefs` in `print.ts`, which does the same for variables).
+ */
 export function collectFragments(sels: readonly Node[]): FragmentDef[] {
-  const found = new Map<string, FragmentDef>();
+  const found = new Map<string, SpreadTarget>();
   const walk = (nodes: readonly Node[]): void => {
     for (const n of nodes) {
       if (n.kind === 'spread') {
-        if (!found.has(n.fragmentName)) {
-          found.set(n.fragmentName, {
-            name: n.handle.name,
-            typeCondition: n.handle.typeCondition,
-            sels: n.handle.sels,
-          });
+        const seen = found.get(n.handle.name);
+        if (seen && seen !== n.handle) {
+          throw new Error(
+            `buildql: two different fragments are both named "${n.handle.name}". ` +
+              'Fragment names must be unique — give one of them a different name.',
+          );
+        }
+        if (!seen) {
+          found.set(n.handle.name, n.handle);
           walk(n.handle.sels);
         }
         continue;
