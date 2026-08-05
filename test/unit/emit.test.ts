@@ -298,3 +298,47 @@ describe('unmappedScalars', () => {
     expect(unmappedScalars(withProtoNamedScalar)).toEqual(['DateTime', 'JSON', 'toString']);
   });
 });
+
+describe('emit — client option', () => {
+  it('defaults to buildql: imports and re-exports createClient', async () => {
+    const src = await generated();
+    expect(src).toContain('  createClient,\n');
+    expect(src).toContain('export { $, v, on, spread, include, skip, createClient };');
+    expect(src).not.toContain('buildql/adapters');
+  });
+
+  it('emits the apollo adapter imports and re-exports', async () => {
+    const src = emit(buildIR(await loadSchema(sdlPath)), 'apollo');
+    expect(src).toContain(
+      "import { apolloDocument, toApolloMutation, toApolloQuery } from 'buildql/adapters/apollo';",
+    );
+    expect(src).toContain(
+      'export { $, v, on, spread, include, skip, apolloDocument, toApolloMutation, toApolloQuery };',
+    );
+    // buildql's own client must not be bound in when another one was chosen.
+    expect(src).not.toContain('createClient');
+  });
+
+  it('emits the urql adapter imports and re-exports', async () => {
+    const src = emit(buildIR(await loadSchema(sdlPath)), 'urql');
+    expect(src).toContain("import { toUrqlArgs, urqlDocument } from 'buildql/adapters/urql';");
+    expect(src).toContain('export { $, v, on, spread, include, skip, toUrqlArgs, urqlDocument };');
+    expect(src).not.toContain('createClient');
+  });
+
+  it('binds no client at all for "none"', async () => {
+    const src = emit(buildIR(await loadSchema(sdlPath)), 'none');
+    expect(src).toContain('export { $, v, on, spread, include, skip };');
+    expect(src).not.toContain('createClient');
+    expect(src).not.toContain('buildql/adapters');
+  });
+
+  it('still emits the runtime builders and the Operation type re-export for every client', async () => {
+    for (const client of ['buildql', 'apollo', 'urql', 'none'] as const) {
+      const src = emit(buildIR(await loadSchema(sdlPath)), client);
+      expect(src).toContain('  makeQuery,\n');
+      expect(src).toContain("export type { Operation } from 'buildql';");
+      expect(src).toContain('export const query = makeQuery(Query)');
+    }
+  });
+});
