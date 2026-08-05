@@ -51,5 +51,5 @@ export interface On<TN extends string, R, V = {}> {
   readonly [VARS]?: V;
 }
 
-export type AnySel = Sel<string, any, any, boolean>;
-export type Node = AnySel | Spread<any, any> | On<string, any, any>;
+export type AnySel = Sel<string, unknown, unknown, boolean>;
+export type Node = AnySel | Spread<unknown, unknown> | On<string, unknown, unknown>;

@@ -58,8 +58,8 @@ type _9 = Expect<
   >
 >;
 
-// 10. empty tuple case - no variables to collect, so result is unknown
-type _10 = Expect<Eq<VarsIn<[]>, unknown>>;
+// 10. empty tuple case - no variables to collect, so result is {}
+type _10 = Expect<Eq<VarsIn<[]>, {}>>;
 
 declare const n: Node;
 export type { n };

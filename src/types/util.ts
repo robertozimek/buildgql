@@ -1,7 +1,7 @@
 /** Flattens intersections so hovers and errors show one object, not `A & B & C`. */
 export type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
-export type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (k: infer I) => void
+export type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never) extends (k: infer I) => void
   ? I
   : never;
 
