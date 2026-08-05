@@ -60,7 +60,11 @@ function printNode(n: Node): string {
 }
 
 function printSels(sels: readonly Node[]): string {
-  return `{ ${sels.map(printNode).join(' ')} }`;
+  const hasInline = sels.some((n) => n.kind === 'on');
+  const hasTypename = sels.some((n) => n.kind === 'field' && (n as AnySel).name === '__typename');
+  const parts = sels.map(printNode);
+  if (hasInline && !hasTypename) parts.unshift('__typename');
+  return `{ ${parts.join(' ')} }`;
 }
 
 /** Walks the whole tree, including inline fragments, spreads and directives. */
