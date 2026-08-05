@@ -16,6 +16,12 @@
     "./client": { "types": "./dist/client/client.d.ts", "import": "./dist/client/client.js", "require": "./dist/client/client.cjs" },
     "./config": { "types": "./dist/cli/config.d.ts", "import": "./dist/cli/config.js", "require": "./dist/cli/config.cjs" }
   },
+  "typesVersions": {
+    "*": {
+      "client": ["./dist/client/client.d.ts"],
+      "config": ["./dist/cli/config.d.ts"]
+    }
+  },
   "files": ["dist"],
   "scripts": {
     "build": "tsup",

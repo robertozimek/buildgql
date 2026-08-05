@@ -65,4 +65,11 @@ describe('buildIR', () => {
     expect(s.scalars.ID).toBe('PostId');
     expect(s.scalars.String).toBe('string');
   });
+
+  it('builds the scalars map with a null prototype, so a scalar named "toString" cannot resolve via Object.prototype', async () => {
+    const s = await ir();
+    expect(Object.getPrototypeOf(s.scalars)).toBe(null);
+    expect(Object.hasOwn(s.scalars, 'toString')).toBe(false);
+    expect(s.scalars['toString']).toBeUndefined();
+  });
 });

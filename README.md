@@ -142,6 +142,10 @@ for await (const msg of client.subscribe(Messages)) {
 ```
 
 `wsTransport()` speaks the `graphql-ws` protocol if your server uses WebSockets.
+Per-subscription `headers` (the third argument to `client.subscribe`) are honoured
+by `sseTransport` but **cannot** be sent by `wsTransport` — the WebSocket API has no
+per-message header mechanism. Authenticate WebSocket subscriptions via
+`connectionParams` instead, which travels in the `connection_init` message body.
 The generated module only exports `subscription` when your schema declares a
 `Subscription` root type — build subscription operations with it the same way
 you build queries and mutations with `query`/`mutation`.

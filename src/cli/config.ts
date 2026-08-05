@@ -47,11 +47,18 @@ function errorMessage(err: unknown): string {
 
 /**
  * True when `err` looks like Node rejected the import specifically because it lacks native
- * TypeScript support, as opposed to the user's config throwing its own runtime error.
+ * TypeScript support, as opposed to the user's config throwing its own runtime error (which
+ * can just as easily be a `SyntaxError` subclass, or throw a plain typo `SyntaxError` from the
+ * config file itself on a Node that runs TypeScript fine). Only Node's own unambiguous error
+ * codes qualify — a blanket `err instanceof SyntaxError` check would also match a genuine typo
+ * in the user's `.ts` config, silently skipping it instead of surfacing the real problem.
+ *
+ * `ERR_UNKNOWN_FILE_EXTENSION` — no native TypeScript support at all (Node < 22.6).
+ * `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` — strip-only mode present, but the config uses syntax
+ * that requires transformation (e.g. `enum`, parameter properties, namespaces).
  */
 function isMissingTypeStrippingSupport(err: unknown): boolean {
-  if (err instanceof SyntaxError) return true;
-  return isRecord(err) && err.code === 'ERR_UNKNOWN_FILE_EXTENSION';
+  return isRecord(err) && (err.code === 'ERR_UNKNOWN_FILE_EXTENSION' || err.code === 'ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
 }
 
 /**
@@ -111,6 +118,11 @@ export async function loadConfig(
         missingTypeStrippingMessage = `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
           `(Node >= 22.6 with --experimental-strip-types, or Node >= 23.6). ` +
           `Otherwise rename it to buildql.config.mjs. Original error: ${errorMessage(err)}`;
+        // Surface the skip immediately — don't defer it to the "nothing loaded" path,
+        // which never runs if a later candidate (e.g. buildql.config.mjs) succeeds.
+        process.stderr.write(
+          `buildql: skipping ${name} — this Node cannot run TypeScript directly. ${errorMessage(err)}\n`,
+        );
         continue;
       }
       throw new Error(`buildql: failed to load ${name}: ${errorMessage(err)}`);

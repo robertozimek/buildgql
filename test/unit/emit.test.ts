@@ -123,6 +123,43 @@ describe('emit', () => {
     expect(src).toContain("args<{ status: Status }>({ status: 'Status!' }, ['status'])");
   });
 
+  it('falls back to `unknown` for an unmapped scalar named "valueOf", rather than splicing in the inherited Object.prototype member', () => {
+    // Regression test for leafTsType/inputTsType: `ir.scalars` here is a plain object
+    // (`DEFAULT_SCALARS` inherits from `Object.prototype`), so a bracket read of
+    // `ir.scalars['valueOf']` without an own-property guard would resolve to
+    // `Object.prototype.valueOf` (a function, not `undefined`) and defeat the `??
+    // UNKNOWN_SCALAR` fallback entirely.
+    const schema: IRSchema = {
+      queryType: 'Query',
+      mutationType: null,
+      subscriptionType: null,
+      scalars: DEFAULT_SCALARS,
+      types: [
+        {
+          name: 'Query',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'weird',
+              type: { wrap: ['!'], name: 'valueOf', kind: 'scalar' },
+              gqlType: 'valueOf!',
+              description: null,
+              deprecated: null,
+              args: [],
+            },
+          ],
+        },
+      ],
+    };
+    const src = emit(schema);
+    expect(src).toContain("weird: leaf<'weird', ['!'], unknown>('weird', ['!'])");
+  });
+
   it('types a union/interface __typename as the union of its possible types, not its own name', () => {
     // Built by hand so the union case is isolated: `possibleTypes` is what
     // `buildIR` already computes from introspection but the emitter used to ignore,
@@ -244,5 +281,20 @@ describe('unmappedScalars', () => {
   it('does not flag scalars covered by the default or configured mapping', () => {
     const mapped: IRSchema = { ...schema, scalars: { ...DEFAULT_SCALARS, DateTime: 'string', JSON: 'unknown' } };
     expect(unmappedScalars(mapped)).toEqual([]);
+  });
+
+  it('flags a scalar named "toString" as unmapped, even though `name in scalars` would resolve it via Object.prototype', () => {
+    // Regression test: `scalars` here is a plain object (as `DEFAULT_SCALARS` is), so
+    // it inherits `toString`/`valueOf`/`constructor` from `Object.prototype`. A
+    // membership check using `in` (rather than `Object.hasOwn`) would treat those
+    // names as "mapped" and never flag them.
+    const withProtoNamedScalar: IRSchema = {
+      ...schema,
+      types: [
+        ...schema.types,
+        { name: 'toString', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
+      ],
+    };
+    expect(unmappedScalars(withProtoNamedScalar)).toEqual(['DateTime', 'JSON', 'toString']);
   });
 });

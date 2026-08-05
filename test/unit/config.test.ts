@@ -103,7 +103,7 @@ describe('loadConfig', () => {
     return (url) => (url === pathToFileURL(brokenPath).href ? Promise.reject(err) : import(url));
   }
 
-  it('falls through to buildql.config.mjs when buildql.config.ts fails with a native "no TypeScript support" SyntaxError', async () => {
+  it('falls through to buildql.config.mjs when buildql.config.ts fails with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX (strip-only mode, non-erasable syntax)', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
     const tsPath = join(dir, 'buildql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
@@ -112,14 +112,31 @@ describe('loadConfig', () => {
       "export default { schema: './schema.graphql', output: './gen' };\n",
     );
 
-    const { config, path } = await loadConfig(
-      dir,
-      importModuleThrowingFor(tsPath, new SyntaxError('TypeScript enum is not supported in strip-only mode')),
-    );
+    const err = Object.assign(new SyntaxError('TypeScript enum is not supported in strip-only mode'), {
+      code: 'ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX',
+    });
+    const { config, path } = await loadConfig(dir, importModuleThrowingFor(tsPath, err));
 
     expect(config.schema).toBe('./schema.graphql');
     expect(config.output).toBe('./gen');
     expect(path).toContain('buildql.config.mjs');
+  });
+
+  it('does NOT fall through — and surfaces the real error — when a .ts config has a genuine syntax error (a bare SyntaxError with no Node error code), even when a valid .mjs is also present', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const tsPath = join(dir, 'buildql.config.ts');
+    await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './should-not-be-used.graphql' };\n",
+    );
+
+    await expect(
+      loadConfig(
+        dir,
+        importModuleThrowingFor(tsPath, new SyntaxError("Unexpected token ')'")),
+      ),
+    ).rejects.toThrow(/Unexpected token/);
   });
 
   it('falls through to buildql.config.mjs when buildql.config.ts fails with ERR_UNKNOWN_FILE_EXTENSION (no native TS support at all)', async () => {
@@ -135,14 +152,43 @@ describe('loadConfig', () => {
     expect(path).toContain('buildql.config.mjs');
   });
 
+  it('writes a stderr line naming the skipped file at the moment it is skipped, not deferred', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const tsPath = join(dir, 'buildql.config.ts');
+    await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
+    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+
+    const err = Object.assign(new Error('Unknown file extension ".ts"'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+    // `vi.spyOn(process.stderr, 'write')` does not reliably observe writes made through
+    // `process.stderr.write` inside this codebase's own modules under Vitest's runner
+    // (the stream's `write` is not a plain own property), so intercept with a direct
+    // reassignment instead — restored in `finally` regardless of outcome.
+    const original = process.stderr.write.bind(process.stderr);
+    const calls: string[] = [];
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      calls.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      await loadConfig(dir, importModuleThrowingFor(tsPath, err));
+    } finally {
+      process.stderr.write = original;
+    }
+
+    const written = calls.join('');
+    expect(written).toContain('buildql.config.ts');
+    expect(written).toMatch(/skip/i);
+  });
+
   it('throws the TypeScript-support error when the only config present cannot be loaded on this Node', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
     const tsPath = join(dir, 'buildql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
 
-    await expect(
-      loadConfig(dir, importModuleThrowingFor(tsPath, new SyntaxError('Unexpected token'))),
-    ).rejects.toThrow(/Node must be able to run TypeScript directly/);
+    const err = Object.assign(new Error('Unknown file extension ".ts"'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+    await expect(loadConfig(dir, importModuleThrowingFor(tsPath, err))).rejects.toThrow(
+      /Node must be able to run TypeScript directly/,
+    );
   });
 
   it('does NOT fall through — and surfaces the real error — when a .ts config throws its own runtime error', async () => {
