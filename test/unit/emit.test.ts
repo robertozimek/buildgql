@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { loadSchema } from '../../src/codegen/introspect.js';
 import { buildIR } from '../../src/codegen/ir.js';
-import { emit } from '../../src/codegen/emit.js';
+import { emit, unmappedScalars } from '../../src/codegen/emit.js';
 import type { IRSchema } from '../../src/codegen/ir.js';
 import { DEFAULT_SCALARS } from '../../src/codegen/scalars.js';
 
@@ -202,5 +202,47 @@ describe('emit', () => {
     expect(src).toContain("__typename: leaf<'__typename', ['!'], string>('__typename', ['!'])");
     // ...and a concrete object type still gets its own single literal name.
     expect(src).toContain("__typename: leaf<'__typename', ['!'], 'Dog'>('__typename', ['!'])");
+  });
+});
+
+describe('unmappedScalars', () => {
+  const schema: IRSchema = {
+    queryType: 'Query',
+    mutationType: null,
+    subscriptionType: null,
+    scalars: DEFAULT_SCALARS,
+    types: [
+      {
+        name: 'Query',
+        kind: 'object',
+        description: null,
+        possibleTypes: [],
+        interfaces: [],
+        enumValues: [],
+        inputFields: [],
+        fields: [
+          {
+            name: 'createdAt',
+            type: { wrap: ['!'], name: 'DateTime', kind: 'scalar' },
+            gqlType: 'DateTime!',
+            description: null,
+            deprecated: null,
+            args: [],
+          },
+        ],
+      },
+      { name: 'DateTime', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
+      { name: 'JSON', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
+      { name: 'String', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
+    ],
+  };
+
+  it('names every custom scalar with no entry in ir.scalars', () => {
+    expect(unmappedScalars(schema)).toEqual(['DateTime', 'JSON']);
+  });
+
+  it('does not flag scalars covered by the default or configured mapping', () => {
+    const mapped: IRSchema = { ...schema, scalars: { ...DEFAULT_SCALARS, DateTime: 'string', JSON: 'unknown' } };
+    expect(unmappedScalars(mapped)).toEqual([]);
   });
 });

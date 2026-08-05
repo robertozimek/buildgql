@@ -11,7 +11,7 @@ export class GraphQLResponseError extends Error {
   readonly data: unknown;
 
   constructor(errors: readonly GraphQLFormattedError[], data: unknown) {
-    super(errors.map((e) => e.message).join('; ') || 'GraphQL request failed');
+    super(`buildql: ${errors.map((e) => e.message).join('; ') || 'GraphQL request failed'}`);
     this.name = 'GraphQLResponseError';
     this.errors = errors;
     this.data = data;
@@ -24,7 +24,7 @@ export class BuildQLHttpError extends Error {
   readonly body: string;
 
   constructor(status: number, body: string) {
-    super(`GraphQL request failed with HTTP ${status}`);
+    super(`buildql: GraphQL request failed with HTTP ${status}`);
     this.name = 'BuildQLHttpError';
     this.status = status;
     this.body = body;

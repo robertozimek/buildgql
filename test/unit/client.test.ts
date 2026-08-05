@@ -66,4 +66,49 @@ describe('createClient', () => {
     expect(err).toBeInstanceOf(BuildQLHttpError);
     expect((err as BuildQLHttpError).body).toBe(malformed);
   });
+
+  it('merges per-request headers with client-level headers, per-request winning on conflict', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async () => jsonResponse({ data: { users: [] } }));
+    const client = createClient({
+      url: 'http://x/graphql',
+      headers: { 'x-client-only': 'client', 'x-both': 'client' },
+      fetch: fetchMock,
+    });
+
+    await client.execute(q, undefined, { headers: { 'x-request-only': 'request', 'x-both': 'request' } });
+
+    const init = fetchMock.mock.calls[0]![1] as RequestInit;
+    const sent = new Headers(init.headers);
+    expect(sent.get('x-client-only')).toBe('client');
+    expect(sent.get('x-request-only')).toBe('request');
+    expect(sent.get('x-both')).toBe('request');
+  });
+
+  it('aborts the request when the passed signal is already aborted', async () => {
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      const signal = (init as RequestInit).signal;
+      if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
+      return jsonResponse({ data: { users: [] } });
+    });
+    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock });
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(client.execute(q, undefined, { signal: controller.signal })).rejects.toThrow(/aborted/i);
+  });
+
+  it('forwards the signal through to fetch so an abort after the call is honored', async () => {
+    let seenSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn<typeof fetch>(async (_url, init) => {
+      seenSignal = (init as RequestInit).signal ?? undefined;
+      return jsonResponse({ data: { users: [] } });
+    });
+    const client = createClient({ url: 'http://x/graphql', fetch: fetchMock });
+    const controller = new AbortController();
+
+    await client.execute(q, undefined, { signal: controller.signal });
+
+    expect(seenSignal).toBe(controller.signal);
+    expect(seenSignal?.aborted).toBe(false);
+  });
 });

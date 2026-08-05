@@ -1,4 +1,4 @@
-import { GraphQLResponseError } from './errors.js';
+import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 
 export interface SubscribePayload {
@@ -13,7 +13,8 @@ export interface StreamChunk {
 }
 
 export interface SubscriptionTransport {
-  subscribe(payload: SubscribePayload, signal: AbortSignal): AsyncIterable<StreamChunk>;
+  /** `headers` carries per-subscription headers from `client.subscribe(op, vars, { headers })`. */
+  subscribe(payload: SubscribePayload, signal: AbortSignal, headers?: HeadersInit): AsyncIterable<StreamChunk>;
 }
 
 export interface SseTransportOptions {
@@ -54,9 +55,12 @@ async function* sseEvents(body: ReadableStream<Uint8Array>): AsyncGenerator<{ ev
 export function sseTransport(opts: SseTransportOptions): SubscriptionTransport {
   const doFetch = opts.fetch ?? globalThis.fetch;
   return {
-    async *subscribe(payload, signal) {
+    async *subscribe(payload, signal, callHeaders) {
       const base = typeof opts.headers === 'function' ? await opts.headers() : (opts.headers ?? {});
       const headers = new Headers(base);
+      // Per-subscription headers (from `client.subscribe(op, vars, { headers })`) override
+      // the transport-level ones, mirroring how `execute`'s per-request headers win.
+      for (const [k, val] of new Headers(callHeaders ?? {})) headers.set(k, val);
       headers.set('content-type', 'application/json');
       headers.set('accept', 'text/event-stream');
 
@@ -67,7 +71,7 @@ export function sseTransport(opts: SseTransportOptions): SubscriptionTransport {
         signal,
       });
       if (!res.ok || !res.body) {
-        throw new Error(`buildql: subscription failed with HTTP ${res.status}`);
+        throw new BuildQLHttpError(res.status, await res.text().catch(() => ''));
       }
       let completed = false;
       for await (const evt of sseEvents(res.body)) {
@@ -99,6 +103,10 @@ export interface WsTransportOptions {
 export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
   const WS = opts.WebSocket ?? globalThis.WebSocket;
   return {
+    // The standard `WebSocket` constructor has no way to set custom HTTP headers, so
+    // per-subscription headers (the third `subscribe` parameter) cannot be honored
+    // here — authenticate via `connectionParams` instead, which travels in the
+    // `connection_init` message body.
     subscribe(payload, signal) {
       const queue: StreamChunk[] = [];
       let done = false;

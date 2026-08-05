@@ -46,9 +46,10 @@ npm i buildql
 
 ## Configure
 
-Create `buildql.config.ts`:
+Create `buildql.config.mjs` — this works on **every** supported Node version,
+including Node 20 in CI:
 
-```ts
+```js
 import { defineConfig } from 'buildql/config';
 
 export default defineConfig({
@@ -62,6 +63,13 @@ export default defineConfig({
   scalars: { DateTime: 'string', JSON: 'unknown' },
 });
 ```
+
+If you'd rather write `buildql.config.ts` for the editor type-checking on
+`defineConfig(...)`, that works too — but only on **Node >= 22.6 run with
+`--experimental-strip-types`, or Node >= 23.6** (where native TypeScript
+support is unflagged). On older Node, buildql falls back to any
+`buildql.config.mjs`/`buildql.config.js` also present; if none is present it
+fails with an error telling you to add one or upgrade Node.
 
 Then:
 
@@ -141,7 +149,11 @@ you build queries and mutations with `query`/`mutation`.
 ## Requirements
 
 - TypeScript **>= 5.4** with `"strict": true`
-- Node **>= 18**
+- Node **>= 18** to install and run the generated client/CLI in general.
+  Loading a **`.ts`** config file specifically needs Node's native TypeScript
+  support: **>= 22.6 with `--experimental-strip-types`, or >= 23.6**. Use
+  `buildql.config.mjs` (see **Configure** above) if you're on an older Node —
+  it works everywhere Node >= 18 does.
 - `graphql` only if you point `schema` at an SDL file — URL and `.json`
   introspection sources need no extra dependency
 

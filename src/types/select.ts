@@ -54,5 +54,4 @@ export type VarsIn<S extends readonly Node[]> = UnionToIntersection<
   }[number]
 >;
 
-export type { KeyOf, PlainFields, SpreadFields, OnBranches };
 export type { AnySel, Node, On, Sel, Spread, KEY, RESULT, VARS };

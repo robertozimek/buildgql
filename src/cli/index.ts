@@ -2,7 +2,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { emit } from '../codegen/emit.js';
+import { emit, unmappedScalars } from '../codegen/emit.js';
 import { buildIR } from '../codegen/ir.js';
 import { loadSchema } from '../codegen/introspect.js';
 import { loadConfig, resolveOutputDir } from './config.js';
@@ -18,6 +18,15 @@ export async function generate(config: BuildQLConfig, cwd: string): Promise<stri
 
   const schema = await loadSchema(source, { headers: config.headers });
   const ir = buildIR(schema, config.scalars);
+
+  const unmapped = unmappedScalars(ir);
+  if (unmapped.length > 0) {
+    process.stderr.write(
+      `buildql: unmapped custom scalar${unmapped.length > 1 ? 's' : ''}: ${unmapped.join(', ')} — ` +
+        `generated as \`unknown\`. Add ${unmapped.length > 1 ? 'them' : 'it'} to "scalars" in your buildql.config.* for real types.\n`,
+    );
+  }
+
   const src = emit(ir);
 
   const dir = resolveOutputDir(config, cwd);
