@@ -38,6 +38,14 @@ async function main() {
   // @ts-expect-error field was not selected
   r.createUser.firstName;
 
+  // Pre-declared vars: without NoInfer, `V` would be inferred from this argument
+  // and the missing `email` would be silently accepted. This is the only case in
+  // this file that actually guards NoInfer — the inline-literal cases above are
+  // caught by excess-property checking regardless.
+  const preDeclared = { name: 'x' };
+  // @ts-expect-error missing required variable
+  await client.execute(m, preDeclared);
+
   return { id, bio };
 }
 
