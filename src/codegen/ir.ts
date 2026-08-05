@@ -24,6 +24,7 @@ export interface IRArg {
 export interface IRField {
   readonly name: string;
   readonly type: IRTypeRef;
+  readonly gqlType: string;
   readonly args: IRArg[];
   readonly description: string | null;
   readonly deprecated: string | null;
@@ -115,6 +116,7 @@ export function buildIR(
     fields: (t.fields ?? []).map((f) => ({
       name: f.name,
       type: flatten(f.type, kinds),
+      gqlType: printGqlType(f.type),
       args: f.args.map((a) => toArg(a, kinds)),
       description: f.description,
       deprecated: f.isDeprecated ? (f.deprecationReason ?? 'deprecated') : null,

@@ -35,6 +35,21 @@ describe('buildIR', () => {
     expect(query.fields.find((f) => f.name === 'post')!.type.wrap).toEqual([]);
   });
 
+  it('does not reverse asymmetric wrapper tuples', async () => {
+    const s = await ir();
+    const query = s.types.find((t) => t.name === 'Query')!;
+    // drafts: [Post!]  -> nullable list of non-null Post; ['l', '!'] is not a palindrome,
+    // so this catches a wrap-order bug that ['!', 'l', '!'] cannot.
+    const drafts = query.fields.find((f) => f.name === 'drafts')!;
+    expect(drafts.type).toMatchObject({
+      wrap: ['l', '!'],
+      name: 'Post',
+      kind: 'object',
+    });
+    // Guards the separate printGqlType path, which has the same order-sensitivity.
+    expect(drafts.gqlType).toBe('[Post!]');
+  });
+
   it('marks nullable arguments optional and records GraphQL type strings', async () => {
     const s = await ir();
     const createUser = s.types.find((t) => t.name === 'Mutation')!.fields.find((f) => f.name === 'createUser')!;
