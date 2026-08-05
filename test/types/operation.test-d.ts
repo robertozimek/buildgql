@@ -30,12 +30,12 @@ const query = makeQuery(Query);
 const mutation = makeMutation(Mutation);
 
 const q = query('Posts', ($, Q) => [
-  Q.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.firstName, A.lastName])]),
+  Q.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.lastName])]),
 ]);
 type _1 = Expect<
   Eq<
     NonNullable<(typeof q)[typeof RESULT]>,
-    { posts: { id: string; title: string; author: { id: string; firstName: string; lastName: string | null } }[] }
+    { posts: { id: string; title: string; author: { id: string; lastName: string | null } }[] }
   >
 >;
 type _2 = Expect<Eq<NonNullable<(typeof q)[typeof VARS]>, {}>>;
