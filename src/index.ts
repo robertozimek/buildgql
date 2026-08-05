@@ -1,4 +1,6 @@
 export { args, leaf, leafArgs, object, objectArgs } from './runtime/builders.js';
+export { collectFragments, makeFragment, spread } from './runtime/fragment.js';
+export type { FragmentHandle } from './runtime/fragment.js';
 export { makeMutation, makeQuery, makeSubscription } from './runtime/operation.js';
 export type { Operation } from './runtime/operation.js';
 export { $, v } from './runtime/var.js';

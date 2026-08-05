@@ -72,7 +72,10 @@ export function collectVarRefs(sels: readonly Node[]): VarRef[] {
         walk((n as On<string, unknown>).sels);
         continue;
       }
-      if (n.kind === 'spread') continue;
+      if (n.kind === 'spread') {
+        walk((n as unknown as { handle: { sels: readonly Node[] } }).handle.sels);
+        continue;
+      }
       const s = n as AnySel;
       if (s.varRefs) out.push(...s.varRefs);
       for (const d of s.directives ?? []) {
