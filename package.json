@@ -1,9 +1,12 @@
 {
   "name": "buildql",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Type-safe GraphQL query builder generated from introspection",
   "license": "MIT",
   "type": "module",
+  "keywords": ["graphql", "typescript", "codegen", "query-builder", "type-safe"],
+  "repository": { "type": "git", "url": "git+https://github.com/rozimek/buildql.git" },
+  "sideEffects": false,
   "bin": { "buildql": "./dist/cli/index.js" },
   "exports": {
     ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "require": "./dist/index.cjs" },
