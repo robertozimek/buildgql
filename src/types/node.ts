@@ -33,10 +33,24 @@ export interface Sel<N extends string, R, V = {}, O extends boolean = false> {
   readonly __optional?: O;
 }
 
+/**
+ * The part of a fragment a spread needs to carry: enough to emit the definition
+ * and to walk into it for variables. Declared here rather than in
+ * `src/runtime/fragment.ts` so `print.ts` and `fragment.ts` share one contract
+ * instead of each re-declaring the shape behind a cast.
+ */
+export interface SpreadTarget {
+  readonly name: string;
+  readonly typeCondition: string;
+  readonly sels: readonly Node[];
+}
+
 /** A fragment spread. Required `kind` discriminant makes Extract/Exclude work. */
 export interface Spread<R, V = {}> {
   readonly kind: 'spread';
   readonly fragmentName: string;
+  /** The fragment being spread. Consumed by `collectFragments` and `collectVarRefs`. */
+  readonly handle: SpreadTarget;
   readonly [RESULT]?: R;
   readonly [VARS]?: V;
 }
