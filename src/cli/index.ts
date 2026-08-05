@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { emit, unmappedScalars } from '../codegen/emit.js';
 import { buildIR } from '../codegen/ir.js';
 import { loadSchema } from '../codegen/introspect.js';
+import { CLIENT_EMITS } from '../codegen/clients.js';
 import { loadConfig, resolveOutputDir } from './config.js';
 import type { BuildQLConfig } from './config.js';
 
@@ -27,7 +28,16 @@ export async function generate(config: BuildQLConfig, cwd: string): Promise<stri
     );
   }
 
-  const src = emit(ir);
+  const client = config.client ?? 'buildql';
+  const { module, names } = CLIENT_EMITS[client];
+  if (module && module !== 'buildql') {
+    process.stdout.write(
+      `buildql: client "${client}" — the generated module re-exports ${names.join(', ')} ` +
+        `from ${module} (requires the "graphql" package)\n`,
+    );
+  }
+
+  const src = emit(ir, client);
 
   const dir = resolveOutputDir(config, cwd);
   await mkdir(dir, { recursive: true });
