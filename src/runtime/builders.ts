@@ -5,13 +5,18 @@ import type { ArgSpec, ArgsInput, VarMarker, VarsOf } from '../types/vars.js';
 import { isVarMarker, markerName } from './var.js';
 
 /** Declares a field's argument types (compile time) and GraphQL types (runtime). */
-export function args<T>(gql: Readonly<Record<string, string>>): ArgSpec<T> {
-  return { gql };
+export function args<T>(gql: Readonly<Record<string, string>>, enums?: readonly string[]): ArgSpec<T> {
+  return enums && enums.length > 0 ? { gql, enums } : { gql };
 }
 
 interface SplitArgs {
   literals: Record<string, unknown>;
   varRefs: VarRef[];
+}
+
+function markEnums(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(markEnums);
+  return typeof value === 'string' ? { __enum: value } : value;
 }
 
 function splitArgs(argv: Record<string, unknown>, spec: ArgSpec<unknown>): SplitArgs {
@@ -28,7 +33,7 @@ function splitArgs(argv: Record<string, unknown>, spec: ArgSpec<unknown>): Split
       varRefs.push({ varName, gqlType });
       literals[key] = { __varRef: varName };
     } else {
-      literals[key] = value;
+      literals[key] = spec.enums?.includes(key) ? markEnums(value) : value;
     }
   }
   return { literals, varRefs };

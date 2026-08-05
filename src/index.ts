@@ -1,3 +1,4 @@
+export { createClient } from './client/client.js';
 export { args, leaf, leafArgs, object, objectArgs } from './runtime/builders.js';
 export { include, skip } from './runtime/directives.js';
 export { collectFragments, makeFragment, spread } from './runtime/fragment.js';
