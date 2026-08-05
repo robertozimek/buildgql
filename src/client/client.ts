@@ -1,11 +1,15 @@
 import type { Operation } from '../runtime/operation.js';
 import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
+import type { SubscriptionTransport } from './subscribe.js';
+
+export { sseTransport, wsTransport } from './subscribe.js';
 
 export interface ClientOptions {
   readonly url: string;
   readonly headers?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
   readonly fetch?: typeof fetch;
+  readonly subscriptions?: SubscriptionTransport;
 }
 
 export interface ExecuteOptions {
@@ -24,6 +28,7 @@ interface RawResponse {
 
 export interface Client {
   execute<R, V>(op: Operation<R, V>, ...rest: VarArgs<V>): Promise<R>;
+  subscribe<R, V>(op: Operation<R, V>, ...rest: VarArgs<V>): AsyncIterable<R>;
   readonly options: ClientOptions;
 }
 
@@ -76,6 +81,31 @@ export function createClient(options: ClientOptions): Client {
         throw new GraphQLResponseError(payload.errors, payload.data);
       }
       return payload.data as R;
+    },
+
+    subscribe<R, V>(op: Operation<R, V>, ...rest: VarArgs<V>): AsyncIterable<R> {
+      const transport = options.subscriptions;
+      if (!transport) {
+        throw new Error('buildql: createClient({ subscriptions }) is required to run subscriptions');
+      }
+      const [vars, opts] = rest as [V | undefined, ExecuteOptions | undefined];
+      const controller = new AbortController();
+      if (opts?.signal) opts.signal.addEventListener('abort', () => controller.abort());
+      const payload = {
+        query: op.document,
+        operationName: op.name,
+        variables: (vars ?? {}) as Record<string, unknown>,
+      };
+      return {
+        async *[Symbol.asyncIterator]() {
+          for await (const chunk of transport.subscribe(payload, controller.signal)) {
+            if (chunk.errors && chunk.errors.length > 0) {
+              throw new GraphQLResponseError(chunk.errors, chunk.data);
+            }
+            yield chunk.data as R;
+          }
+        },
+      };
     },
   };
 }
