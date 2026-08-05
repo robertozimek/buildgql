@@ -90,7 +90,10 @@ export function createClient(options: ClientOptions): Client {
       }
       const [vars, opts] = rest as [V | undefined, ExecuteOptions | undefined];
       const controller = new AbortController();
-      if (opts?.signal) opts.signal.addEventListener('abort', () => controller.abort());
+      if (opts?.signal) {
+        if (opts.signal.aborted) controller.abort();
+        else opts.signal.addEventListener('abort', () => controller.abort());
+      }
       const payload = {
         query: op.document,
         operationName: op.name,

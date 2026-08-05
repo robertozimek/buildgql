@@ -3,6 +3,7 @@ import { leaf, object } from '../../src/runtime/builders.js';
 import { makeSubscription } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/client.js';
 import { sseTransport, wsTransport } from '../../src/client/subscribe.js';
+import type { SubscriptionTransport } from '../../src/client/subscribe.js';
 
 const Msg = { id: leaf<'id', ['!'], string>('id', ['!']) };
 const subscription = makeSubscription({ messages: object('messages', ['!'], Msg) });
@@ -49,6 +50,43 @@ it('handles a data event split across chunk boundaries', async () => {
   const seen: string[] = [];
   for await (const chunk of client.subscribe(s)) seen.push(chunk.messages.id);
   expect(seen).toEqual(['1']);
+});
+
+it('parses CRLF-framed SSE events (real servers emit \\r\\n line endings)', async () => {
+  const fetchMock = vi.fn<typeof fetch>(async () =>
+    sseResponse([
+      'event: next\r\ndata: {"data":{"messages":{"id":"1"}}}\r\n\r\n',
+      'event: next\r\ndata: {"data":{"messages":{"id":"2"}}}\r\n\r\n',
+      'event: complete\r\ndata: \r\n\r\n',
+    ]),
+  );
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: sseTransport({ url: 'http://x/graphql', fetch: fetchMock }),
+  });
+
+  const seen: string[] = [];
+  for await (const chunk of client.subscribe(s)) seen.push(chunk.messages.id);
+  expect(seen).toEqual(['1', '2']);
+});
+
+it('throws instead of completing silently when an SSE stream ends mid-event', async () => {
+  const fetchMock = vi.fn<typeof fetch>(async () =>
+    // No terminating `\n\n` and no `complete` event: the connection was dropped
+    // mid-message rather than finishing cleanly.
+    sseResponse(['event: next\ndata: {"data":{"mess']),
+  );
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: sseTransport({ url: 'http://x/graphql', fetch: fetchMock }),
+  });
+
+  const drain = async () => {
+    for await (const _chunk of client.subscribe(s)) {
+      /* nothing should ever be yielded */
+    }
+  };
+  await expect(drain()).rejects.toThrow('buildql: subscription stream ended before completing');
 });
 
 /**
@@ -104,6 +142,17 @@ class FakeWebSocket extends EventTarget implements WebSocket {
   }
 }
 
+/**
+ * Same shape as `FakeWebSocket`, but `send` throws synchronously — reproducing what a
+ * real `WebSocket` does when asked to send while closed (or before it ever finished
+ * opening). Used to verify `onopen`'s guard against becoming an unhandled rejection.
+ */
+class ThrowingSendWebSocket extends FakeWebSocket {
+  override send(): void {
+    throw new Error('buildql: socket is not open');
+  }
+}
+
 it('drives the graphql-ws handshake: connection_init -> ack -> subscribe -> next -> complete', async () => {
   FakeWebSocket.instances.length = 0;
 
@@ -142,4 +191,120 @@ it('drives the graphql-ws handshake: connection_init -> ack -> subscribe -> next
   const second = iterator.next();
   socket.emitMessage({ type: 'complete', id: '1' });
   await expect(second).resolves.toEqual({ value: undefined, done: true });
+});
+
+it('surfaces the server-provided detail from a WS `error` message', async () => {
+  FakeWebSocket.instances.length = 0;
+
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: wsTransport({ url: 'ws://x/graphql', WebSocket: FakeWebSocket }),
+  });
+
+  const iterator = client.subscribe(s)[Symbol.asyncIterator]();
+  const first = iterator.next();
+
+  const socket = FakeWebSocket.instances[0];
+  await socket.onopen?.call(socket, new Event('open'));
+  socket.emitMessage({ type: 'connection_ack' });
+
+  // graphql-ws defines `payload` on an `error` message as `GraphQLFormattedError[]`.
+  socket.emitMessage({
+    type: 'error',
+    id: '1',
+    payload: [{ message: 'Syntax Error: Unexpected Name "bogus"' }],
+  });
+
+  await expect(first).rejects.toMatchObject({
+    name: 'GraphQLResponseError',
+    message: expect.stringContaining('Syntax Error: Unexpected Name "bogus"'),
+    errors: [{ message: 'Syntax Error: Unexpected Name "bogus"' }],
+  });
+});
+
+it('throws when the WS socket closes without a complete message (abnormal close)', async () => {
+  FakeWebSocket.instances.length = 0;
+
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: wsTransport({ url: 'ws://x/graphql', WebSocket: FakeWebSocket }),
+  });
+
+  const iterator = client.subscribe(s)[Symbol.asyncIterator]();
+  const first = iterator.next();
+
+  const socket = FakeWebSocket.instances[0];
+  await socket.onopen?.call(socket, new Event('open'));
+  socket.emitMessage({ type: 'connection_ack' });
+  socket.emitMessage({ type: 'next', id: '1', payload: { data: { messages: { id: '1' } } } });
+  await expect(first).resolves.toEqual({ value: { messages: { id: '1' } }, done: false });
+
+  // The socket goes away (network drop, code 1006) without ever sending `complete`.
+  const second = iterator.next();
+  socket.onclose?.call(socket, new CloseEvent('close', { code: 1006, wasClean: false }));
+  await expect(second).rejects.toThrow('buildql: subscription stream ended before completing');
+});
+
+it('does not leave an unhandled rejection when onopen fails to send, and surfaces the failure instead', async () => {
+  FakeWebSocket.instances.length = 0;
+
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: wsTransport({ url: 'ws://x/graphql', WebSocket: ThrowingSendWebSocket }),
+  });
+
+  const iterator = client.subscribe(s)[Symbol.asyncIterator]();
+  const first = iterator.next();
+  const socket = FakeWebSocket.instances[0];
+
+  // `onopen` fires the same way a real WebSocket would — nothing in the transport
+  // awaits it. If the synchronous throw from `send` weren't caught, this `await`
+  // would itself reject (and in a real app, nothing would be there to catch it).
+  await expect(socket.onopen?.call(socket, new Event('open'))).resolves.toBeUndefined();
+  await expect(first).rejects.toThrow('buildql: socket is not open');
+});
+
+it('yields a queued `next` value even when `complete` arrives in the same turn, before the consumer drains', async () => {
+  FakeWebSocket.instances.length = 0;
+
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: wsTransport({ url: 'ws://x/graphql', WebSocket: FakeWebSocket }),
+  });
+
+  const iterator = client.subscribe(s)[Symbol.asyncIterator]();
+  const first = iterator.next();
+
+  const socket = FakeWebSocket.instances[0];
+  await socket.onopen?.call(socket, new Event('open'));
+  socket.emitMessage({ type: 'connection_ack' });
+
+  // Both messages are delivered synchronously, before the consumer ever calls
+  // `iterator.next()` again — the queue must be drained fully before `done` is
+  // honored, or this `next` value would be lost.
+  socket.emitMessage({ type: 'next', id: '1', payload: { data: { messages: { id: '1' } } } });
+  socket.emitMessage({ type: 'complete', id: '1' });
+
+  await expect(first).resolves.toEqual({ value: { messages: { id: '1' } }, done: false });
+  await expect(iterator.next()).resolves.toEqual({ value: undefined, done: true });
+});
+
+it('aborts the transport signal immediately when the caller signal is already aborted', async () => {
+  const controller = new AbortController();
+  controller.abort();
+
+  const seenSignals: AbortSignal[] = [];
+  const transport: SubscriptionTransport = {
+    async *subscribe(_payload, signal) {
+      seenSignals.push(signal);
+    },
+  };
+  const client = createClient({ url: 'http://x/graphql', subscriptions: transport });
+
+  const seen: unknown[] = [];
+  for await (const chunk of client.subscribe(s, undefined, { signal: controller.signal })) seen.push(chunk);
+
+  expect(seen).toEqual([]);
+  expect(seenSignals).toHaveLength(1);
+  expect(seenSignals[0]?.aborted).toBe(true);
 });
