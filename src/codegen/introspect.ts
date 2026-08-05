@@ -41,6 +41,10 @@ export interface IntrospectionResult {
   };
 }
 
+function isIntrospectionResult(value: unknown): value is IntrospectionResult {
+  return typeof value === 'object' && value !== null && '__schema' in value;
+}
+
 const TYPE_REF = `
   kind name
   ofType { kind name
@@ -113,7 +117,11 @@ async function introspectSdl(source: string): Promise<IntrospectionResult> {
   }
   const sdl = await readFile(source, 'utf8');
   const schema = gql.buildSchema(sdl, { assumeValidSDL: true });
-  return gql.executeSync({ schema, document: gql.parse(INTROSPECTION_QUERY) }).data as unknown as IntrospectionResult;
+  const result = gql.executeSync({ schema, document: gql.parse(INTROSPECTION_QUERY) }).data;
+  if (!isIntrospectionResult(result)) {
+    throw new Error(`buildql: introspection of "${source}" returned no __schema`);
+  }
+  return result;
 }
 
 async function introspectJson(source: string): Promise<IntrospectionResult> {

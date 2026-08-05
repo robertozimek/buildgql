@@ -57,4 +57,27 @@ describe('loadSchema', () => {
       loadSchema('https://api.example.com/graphql', { fetch: fetchMock }),
     ).rejects.toThrow(/introspection disabled/);
   });
+
+  it('reports a helpful error when the introspection response is non-2xx', async () => {
+    const fetchMock = vi.fn<typeof fetch>(
+      async () =>
+        new Response('internal error', {
+          status: 500,
+          headers: { 'content-type': 'text/plain' },
+        }),
+    );
+    await expect(
+      loadSchema('https://api.example.com/graphql', { fetch: fetchMock }),
+    ).rejects.toThrow(/api\.example\.com\/graphql.*500/);
+  });
+
+  it('reports a helpful error when a .json file lacks __schema', async () => {
+    const { mkdtemp, writeFile } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-'));
+    const file = join(dir, 'schema.json');
+    await writeFile(file, JSON.stringify({ notAnIntrospectionResult: true }));
+    await expect(loadSchema(file)).rejects.toThrow(/no __schema key/);
+  });
 });
