@@ -96,4 +96,20 @@ describe('printOperation', () => {
     ]);
     expect(doc).toBe('query Q { f(where: {ids: ["a", "b"], ok: true}) { id } }');
   });
+
+  it('prints enum literals unquoted and strings quoted', () => {
+    const F = {
+      f: objectArgs(
+        'f',
+        ['!'],
+        User,
+        args<{ status: 'ACTIVE' | 'BANNED'; name: string }>(
+          { status: 'Status!', name: 'String!' },
+          ['status'],
+        ),
+      ),
+    };
+    const doc = printOperation('query', 'Q', [F.f({ status: 'ACTIVE', name: 'Ada' }, (U) => [U.id])]);
+    expect(doc).toBe('query Q { f(status: ACTIVE, name: "Ada") { id } }');
+  });
 });

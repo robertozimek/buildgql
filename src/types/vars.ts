@@ -20,6 +20,8 @@ export type ArgsInput<Spec> = { [K in keyof Spec]: Arg<Spec[K]> };
  */
 export interface ArgSpec<T> {
   readonly gql: Readonly<Record<string, string>>;
+  /** Arg keys whose base type is an enum — their literals must print unquoted. */
+  readonly enums?: readonly string[];
   readonly __t?: T;
 }
 
