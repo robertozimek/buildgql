@@ -146,3 +146,99 @@ it('executes generated operations against the real server, including an unquoted
   const byStatus = await client.execute(mod.s);
   expect(byStatus).toEqual({ postsByStatus: [{ id: 'p1', title: 'Hello', status: 'PUBLISHED' }] });
 }, 60_000);
+
+it('generates a urql-bound module that type-checks under strict mode and runs', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-e2e-urql-'));
+  const file = await generate({ schema: server.url, output: '.', client: 'urql' }, dir);
+
+  // Neither `buildql` nor `buildql/adapters/urql` resolves from a throwaway temp
+  // directory, so both runtime imports are rewritten to this project's own sources. The
+  // two quoted specifiers are distinct strings, so a single `.replace` each is enough and
+  // the order between them does not matter. As in the default-client case above, the
+  // trailing type-only `export type { Operation } from 'buildql'` is erased at runtime and
+  // is resolved for `tsc` by the `paths` mapping below instead.
+  const adapterPath = new URL('../../src/adapters/urql.ts', import.meta.url).pathname;
+  const patched = (await readFile(file, 'utf8'))
+    .replace("from 'buildql/adapters/urql'", `from '${adapterPath}'`)
+    .replace("from 'buildql'", `from '${srcIndexPath}'`);
+  await writeFile(file, patched);
+
+  const urqlUsageFile = join(dir, 'usage.ts');
+  await writeFile(
+    urqlUsageFile,
+    `import { query, toUrqlArgs, urqlDocument } from './index.js';
+
+export const q = query('Posts', ($, Q) => [Q.posts((P) => [P.id, P.title])]);
+
+// \`postsByStatus(status: Status!)\` is required in the fixture schema, so this operation
+// has a required \`status\` variable of the generated \`Status\` union.
+export const byStatus = query('PostsByStatus', ($, Q) => [
+  Q.postsByStatus({ status: $.status }, (P) => [P.id, P.title, P.status]),
+]);
+
+export const withVars = toUrqlArgs(byStatus, { status: 'PUBLISHED' });
+export const noVars = toUrqlArgs(q);
+export const doc = urqlDocument(q);
+
+// The adapter must carry the INFERRED variables through, not widen them to a record —
+// a plain DocumentNode would still compile everywhere else in this file.
+export const status: 'DRAFT' | 'PUBLISHED' = withVars.variables.status;
+
+// @ts-expect-error the operation declares a required \`status\` variable
+toUrqlArgs(byStatus);
+// @ts-expect-error wrong variable type
+toUrqlArgs(byStatus, { status: 'ARCHIVED' });
+`,
+  );
+
+  await writeFile(
+    join(dir, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        noEmit: true,
+        target: 'ES2020',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+        skipLibCheck: true,
+        allowImportingTsExtensions: true,
+        paths: { buildql: [srcIndexPath] },
+      },
+      include: ['index.ts', 'usage.ts'],
+    }),
+  );
+
+  const tsc = new URL('../../node_modules/typescript/bin/tsc', import.meta.url).pathname;
+  await expect(run(process.execPath, [tsc, '-p', join(dir, 'tsconfig.json')])).resolves.toBeTruthy();
+
+  type PostsResult = { posts: { id: string; title: string }[] };
+  type ByStatusResult = { postsByStatus: { id: string; title: string; status: 'DRAFT' | 'PUBLISHED' }[] };
+
+  const mod = (await import(pathToFileURL(urqlUsageFile).href)) as {
+    readonly q: Operation<PostsResult, {}>;
+    readonly byStatus: Operation<ByStatusResult, { status: 'DRAFT' | 'PUBLISHED' }>;
+    readonly withVars: { query: { kind: string; definitions: readonly unknown[] }; variables: { status: string } };
+    readonly noVars: { query: { kind: string }; variables: Record<string, never> };
+    readonly doc: { kind: string };
+  };
+
+  // The adapter produced a real parsed AST, and the same one for the same operation.
+  expect(mod.noVars.query.kind).toBe('Document');
+  expect(mod.doc).toBe(mod.noVars.query);
+  expect(mod.noVars.variables).toEqual({});
+  expect(mod.withVars.variables).toEqual({ status: 'PUBLISHED' });
+  expect(mod.withVars.query.definitions).toHaveLength(1);
+
+  // The generated module binds urql and NOT buildql's own client.
+  const generated = (await import(pathToFileURL(file).href)) as Record<string, unknown>;
+  expect(typeof generated.toUrqlArgs).toBe('function');
+  expect(typeof generated.urqlDocument).toBe('function');
+  expect(generated.createClient).toBeUndefined();
+
+  // The document the adapter handed to urql is still the one the server accepts —
+  // executing it through buildql's client proves the adapter changed nothing but the form.
+  const client = createClient({ url: server.url });
+  expect(await client.execute(mod.byStatus, { status: 'PUBLISHED' })).toEqual({
+    postsByStatus: [{ id: 'p1', title: 'Hello', status: 'PUBLISHED' }],
+  });
+}, 60_000);
