@@ -46,4 +46,41 @@ describe('loadConfig', () => {
     await writeFile(join(dir, 'buildql.config.mjs'), 'export default { schema: 42 };\n');
     await expect(loadConfig(dir)).rejects.toThrow(/"schema"/);
   });
+
+  it('errors clearly when output is not a string', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './schema.graphql', output: 42 };\n",
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"output"/);
+  });
+
+  it('errors clearly when headers is not a string record', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './schema.graphql', headers: { Authorization: 42 } };\n",
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"headers"/);
+  });
+
+  it('errors clearly when scalars is not a string record', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './schema.graphql', scalars: { DateTime: 42 } };\n",
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars"/);
+  });
+
+  it('surfaces the config module\'s own error instead of TypeScript-support advice', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "throw new Error('boom: DATABASE_URL is not set');\n",
+    );
+    await expect(loadConfig(dir)).rejects.toThrow(/boom: DATABASE_URL is not set/);
+    await expect(loadConfig(dir)).rejects.not.toThrow(/Node must be able to run TypeScript directly/);
+  });
 });

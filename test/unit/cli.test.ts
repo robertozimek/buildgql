@@ -1,11 +1,34 @@
-import { expect, it } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { mkdtemp, readFile, writeFile, copyFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generate } from '../../src/cli/index.js';
+import { generate, main } from '../../src/cli/index.js';
 
 const sdlPath = fileURLToPath(new URL('../fixtures/schema.graphql', import.meta.url));
+
+// main() writes usage/status text to the real stdout/stderr; spy on both so the test
+// run's own output stays pristine, and restore them after every test.
+function spyOnWrite(stream: NodeJS.WriteStream) {
+  return vi.spyOn(stream, 'write').mockImplementation(() => true);
+}
+type WriteSpy = ReturnType<typeof spyOnWrite>;
+let stdoutSpy: WriteSpy;
+let stderrSpy: WriteSpy;
+
+beforeEach(() => {
+  stdoutSpy = spyOnWrite(process.stdout);
+  stderrSpy = spyOnWrite(process.stderr);
+});
+
+afterEach(() => {
+  stdoutSpy.mockRestore();
+  stderrSpy.mockRestore();
+});
+
+function written(spy: WriteSpy): string {
+  return spy.mock.calls.map((call) => String(call[0])).join('');
+}
 
 it('generates a file at the configured output path', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
@@ -22,4 +45,45 @@ it('applies scalar overrides from config', async () => {
   await copyFile(sdlPath, join(dir, 'schema.graphql'));
   const out = await generate({ schema: './schema.graphql', scalars: { ID: 'MyId' } }, dir);
   expect(await readFile(out, 'utf8')).toContain("leaf<'id', ['!'], MyId>");
+});
+
+it('main() with no args returns 1 and prints usage', async () => {
+  const code = await main([]);
+  expect(code).toBe(1);
+  expect(written(stdoutSpy)).toContain('Usage:');
+});
+
+it('main() --help returns 0 and prints usage', async () => {
+  const code = await main(['--help']);
+  expect(code).toBe(0);
+  expect(written(stdoutSpy)).toContain('Usage:');
+});
+
+it('main() with an unknown command returns 1', async () => {
+  const code = await main(['bogus']);
+  expect(code).toBe(1);
+  expect(written(stderrSpy)).toContain('unknown command "bogus"');
+});
+
+it('main() generate returns 0 and writes the file when config is valid', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-main-'));
+  await copyFile(sdlPath, join(dir, 'schema.graphql'));
+  await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+
+  const code = await main(['generate', '--config', dir]);
+
+  expect(code).toBe(0);
+  const out = join(dir, 'src/gql/index.ts');
+  const src = await readFile(out, 'utf8');
+  expect(src).toContain('export const Post = {');
+  expect(written(stdoutSpy)).toContain(`wrote ${out}`);
+});
+
+it('main() generate returns 1 without throwing when no config is present', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-main-'));
+
+  const code = await main(['generate', '--config', dir]);
+
+  expect(code).toBe(1);
+  expect(written(stderrSpy)).toContain('buildql: no config found');
 });

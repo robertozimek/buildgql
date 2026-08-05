@@ -55,7 +55,8 @@ export async function main(argv: string[]): Promise<number> {
     process.stdout.write(`buildql: wrote ${out}\n`);
     return 0;
   } catch (err) {
-    process.stderr.write(`${(err as Error).message}\n`);
+    const message = err instanceof Error ? err.message : String(err);
+    process.stderr.write(`${message}\n`);
     return 1;
   }
 }

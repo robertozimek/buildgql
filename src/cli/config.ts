@@ -17,6 +17,8 @@ export function defineConfig(config: BuildQLConfig): BuildQLConfig {
   return config;
 }
 
+// ESM-first, legacy last: prefer native TS/ESM config formats and fall back to plain .js only
+// when nothing else is present.
 const CANDIDATES = ['buildql.config.ts', 'buildql.config.mts', 'buildql.config.mjs', 'buildql.config.js'];
 
 async function exists(p: string): Promise<boolean> {
@@ -33,9 +35,46 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** True when `value` is a well-formed BuildQLConfig: at minimum a non-empty string `schema`. */
-function isBuildQLConfig(value: unknown): value is BuildQLConfig {
-  return isRecord(value) && typeof value.schema === 'string' && value.schema.length > 0;
+/** True when every own value of `value` is a string (used for the `headers`/`scalars` maps). */
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return isRecord(value) && Object.values(value).every((v) => typeof v === 'string');
+}
+
+/** Extracts a readable message from a caught `unknown` without assuming it's an `Error`. */
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * True when `err` looks like Node rejected the import specifically because it lacks native
+ * TypeScript support, as opposed to the user's config throwing its own runtime error.
+ */
+function isMissingTypeStrippingSupport(err: unknown): boolean {
+  if (err instanceof SyntaxError) return true;
+  return isRecord(err) && err.code === 'ERR_UNKNOWN_FILE_EXTENSION';
+}
+
+/**
+ * Throws a field-specific `buildql:`-prefixed error unless `value` is a well-formed
+ * BuildQLConfig: a non-empty string `schema`, and — when present — a string `output` and
+ * string-valued `headers`/`scalars` records.
+ */
+function assertBuildQLConfig(
+  name: string,
+  value: Record<string, unknown>,
+): asserts value is Record<string, unknown> & BuildQLConfig {
+  if (typeof value.schema !== 'string' || value.schema.length === 0) {
+    throw new Error(`buildql: ${name} is missing "schema" — set it to a URL, a .json, or a .graphql file`);
+  }
+  if (value.output !== undefined && typeof value.output !== 'string') {
+    throw new Error(`buildql: ${name}'s "output" must be a string path`);
+  }
+  if (value.headers !== undefined && !isStringRecord(value.headers)) {
+    throw new Error(`buildql: ${name}'s "headers" must be a record of string values`);
+  }
+  if (value.scalars !== undefined && !isStringRecord(value.scalars)) {
+    throw new Error(`buildql: ${name}'s "scalars" must be a record of string values`);
+  }
 }
 
 export async function loadConfig(cwd: string = process.cwd()): Promise<{ config: BuildQLConfig; path: string }> {
@@ -47,14 +86,14 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<{ config:
     try {
       mod = await import(pathToFileURL(path).href);
     } catch (err) {
-      if (name.endsWith('.ts') || name.endsWith('.mts')) {
+      if ((name.endsWith('.ts') || name.endsWith('.mts')) && isMissingTypeStrippingSupport(err)) {
         throw new Error(
           `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
             `(Node >= 22.6 with --experimental-strip-types, or Node >= 23.6). ` +
-            `Otherwise rename it to buildql.config.mjs. Original error: ${(err as Error).message}`,
+            `Otherwise rename it to buildql.config.mjs. Original error: ${errorMessage(err)}`,
         );
       }
-      throw err;
+      throw new Error(`buildql: failed to load ${name}: ${errorMessage(err)}`);
     }
 
     if (!isRecord(mod) || !('default' in mod)) {
@@ -64,9 +103,7 @@ export async function loadConfig(cwd: string = process.cwd()): Promise<{ config:
     if (!isRecord(config)) {
       throw new Error(`buildql: ${name}'s default export must be an object (use defineConfig({...}))`);
     }
-    if (!isBuildQLConfig(config)) {
-      throw new Error(`buildql: ${name} is missing "schema" — set it to a URL, a .json, or a .graphql file`);
-    }
+    assertBuildQLConfig(name, config);
     return { config, path };
   }
   throw new Error(
