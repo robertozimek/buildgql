@@ -1,5 +1,7 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -39,7 +41,27 @@ interface ErrorExports {
 const ERROR_NAMES = ['BuildQLError', 'BuildQLHttpError', 'BuildQLResponseError'] as const;
 
 /** Every built file this suite reaches for, so an unbuilt tree fails once and by name. */
-const REQUIRED = ['index.cjs', 'index.js', 'client/index.cjs', 'client/index.js', 'cli/index.js'];
+const REQUIRED = [
+  'index.cjs',
+  'index.js',
+  'client/index.cjs',
+  'client/index.js',
+  'cli/config.cjs',
+  'cli/config.js',
+  'cli/index.js',
+  'adapters/apollo.cjs',
+  'adapters/apollo.js',
+  'adapters/urql.cjs',
+  'adapters/urql.js',
+];
+
+/** The absolute built file each `exports` subpath resolves to under one condition. */
+function exportsUnder(condition: 'import' | 'require'): [subpath: string, absolute: string][] {
+  return Object.entries(pkg.exports).flatMap(([sub, conds]) => {
+    const rel = conds[condition];
+    return rel ? [[sub, fileURLToPath(new URL(rel, repoRoot))] as [string, string]] : [];
+  });
+}
 
 beforeAll(() => {
   // Never skip when `dist/` is absent. A suite that quietly no-ops when unbuilt reads
@@ -63,11 +85,21 @@ describe('cross-entry error class identity', () => {
   // copies, `catch (e) { if (e instanceof BuildQLError) }` — the single reason the base
   // class exists — silently returns false for anything thrown by the other entry.
 
+  // Each loop asserts PRESENCE before identity. `toBe` alone passes vacuously as
+  // `undefined === undefined`, so dropping a class from BOTH barrels — the likeliest
+  // way to lose one on a branch whose subject is barrel restructuring — would satisfy
+  // the identity check while deleting the export outright. `BuildQLResponseError` in
+  // particular is never dereferenced anywhere else in this file.
+
   it('holds for CJS consumers (tsup does not split CJS unless told to)', () => {
     const root = requireDist(`${distDir}index.cjs`) as ErrorExports;
     const client = requireDist(`${distDir}client/index.cjs`) as ErrorExports;
 
-    for (const name of ERROR_NAMES) expect(client[name]).toBe(root[name]);
+    for (const name of ERROR_NAMES) {
+      expect(root[name], `${name} is missing from dist/index.cjs`).toBeTypeOf('function');
+      expect(client[name], `${name} is missing from dist/client/index.cjs`).toBeTypeOf('function');
+      expect(client[name]).toBe(root[name]);
+    }
     expect(new client.BuildQLHttpError(500, 'x')).toBeInstanceOf(root.BuildQLError);
     expect(new root.BuildQLHttpError(500, 'x')).toBeInstanceOf(client.BuildQLError);
   });
@@ -78,7 +110,11 @@ describe('cross-entry error class identity', () => {
     const root = await importDist('index.js');
     const client = await importDist('client/index.js');
 
-    for (const name of ERROR_NAMES) expect(client[name]).toBe(root[name]);
+    for (const name of ERROR_NAMES) {
+      expect(root[name], `${name} is missing from dist/index.js`).toBeTypeOf('function');
+      expect(client[name], `${name} is missing from dist/client/index.js`).toBeTypeOf('function');
+      expect(client[name]).toBe(root[name]);
+    }
     expect(new client.BuildQLHttpError(500, 'x')).toBeInstanceOf(root.BuildQLError);
   });
 });
@@ -110,4 +146,82 @@ describe('published entry points', () => {
     const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
     expect(readFileSync(bin, 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
   });
+
+  // Existence is not loadability. `splitting: true` rewrites the CJS bundles through
+  // sucrase, which can produce a file that stats fine and throws on require — so every
+  // published bundle is actually loaded, in the module system its condition promises.
+
+  it('loads every CJS bundle named in exports.require', () => {
+    const entries = exportsUnder('require');
+    expect(entries.length).toBe(Object.keys(pkg.exports).length);
+    for (const [sub, abs] of entries) {
+      const mod = requireDist(abs) as Record<string, unknown>;
+      expect(Object.keys(mod).length, `buildql${sub.slice(1)} loaded but exported nothing`).toBeGreaterThan(
+        0,
+      );
+    }
+  });
+
+  it('loads every ESM bundle named in exports.import, plus the bin', async () => {
+    const entries = exportsUnder('import');
+    expect(entries.length).toBe(Object.keys(pkg.exports).length);
+    // `bin` has no `exports` entry, so it would otherwise never be loaded. Importing it is
+    // safe: its main block is behind `isEntrypoint(import.meta.url, process.argv[1])`, and
+    // under vitest `argv[1]` is vitest's own binary — so the guard is false and nothing runs.
+    for (const [sub, abs] of [...entries, ['bin', fileURLToPath(new URL(pkg.bin.buildql, repoRoot))]]) {
+      const mod = (await import(pathToFileURL(abs!).href)) as Record<string, unknown>;
+      expect(Object.keys(mod).length, `${sub} loaded but exported nothing`).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('loadConfig, called from the built bundles', () => {
+  // The only assertions in this file that call INTO a built bundle rather than merely
+  // loading it — and the only ones that catch this class of bug at all.
+  //
+  // tsup implements CJS splitting by running the output through sucrase, which rewrites
+  // dynamic `import(x)` into `require(x)`. `loadConfig` imports a `file:` URL, which
+  // `import()` accepts and `require()` rejects with "Cannot find module 'file:///...'".
+  // Importing `config.cjs` does not notice: the rewritten call sits inside
+  // `defaultImporter` and only fails when a config is actually loaded. That shipped a
+  // dead `exports["./config"].require` past a fully green gate once already.
+
+  function withConfigDir(run: (dir: string) => Promise<void>): () => Promise<void> {
+    return async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'buildql-config-'));
+      try {
+        writeFileSync(
+          join(dir, 'buildql.config.mjs'),
+          "export default { schema: './schema.graphql', output: './out' };\n",
+        );
+        await run(dir);
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    };
+  }
+
+  interface ConfigModule {
+    loadConfig: (cwd: string) => Promise<{ config: { schema: string; output?: string }; path: string }>;
+  }
+
+  it(
+    'resolves a real buildql.config.mjs from the CJS bundle',
+    withConfigDir(async (dir) => {
+      const mod = requireDist(`${distDir}cli/config.cjs`) as ConfigModule;
+      const loaded = await mod.loadConfig(dir);
+      expect(loaded.config.schema).toBe('./schema.graphql');
+      expect(loaded.path).toBe(join(dir, 'buildql.config.mjs'));
+    }),
+  );
+
+  it(
+    'resolves a real buildql.config.mjs from the ESM bundle',
+    withConfigDir(async (dir) => {
+      const mod = (await import(pathToFileURL(`${distDir}cli/config.js`).href)) as unknown as ConfigModule;
+      const loaded = await mod.loadConfig(dir);
+      expect(loaded.config.schema).toBe('./schema.graphql');
+      expect(loaded.path).toBe(join(dir, 'buildql.config.mjs'));
+    }),
+  );
 });
