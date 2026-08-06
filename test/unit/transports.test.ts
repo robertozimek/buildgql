@@ -2,8 +2,9 @@ import { expect, it, vi } from 'vitest';
 import { leafField, objectField } from '../../src/runtime/builders.js';
 import { makeSubscription } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/index.js';
-import { sseTransport, wsTransport } from '../../src/client/subscribe.js';
-import type { SubscriptionTransport } from '../../src/client/subscribe.js';
+import { sseTransport } from '../../src/client/sse-transport.js';
+import { wsTransport } from '../../src/client/ws-transport.js';
+import type { SubscriptionTransport } from '../../src/client/transport.js';
 import { BuildQLHttpError } from '../../src/client/errors.js';
 
 const Msg = { id: leafField<'id', ['!'], string>('id', ['!']) };

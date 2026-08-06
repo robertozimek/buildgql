@@ -4,7 +4,7 @@ import { BuildQLHttpError, BuildQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 import { mergeHeaders, resolveHeaders } from './headers.js';
 import type { HeadersSource } from './headers.js';
-import type { SubscriptionTransport } from './subscribe.js';
+import type { SubscriptionTransport } from './transport.js';
 
 export interface ClientOptions {
   readonly url: string;
