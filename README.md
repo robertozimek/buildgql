@@ -44,8 +44,10 @@ re-exported from it, so everyday code only needs that one import.
 npm i buildql
 ```
 
-Contributing? See [CONTRIBUTING.md](./CONTRIBUTING.md) for the naming and
-type-performance conventions the linter enforces.
+Contributing? See [CONTRIBUTING.md](./CONTRIBUTING.md) for the naming, error, and
+type-performance conventions this repo follows — `npm run check` enforces what's
+mechanical (case shape, the `any` ban, the type-instantiation budget); the rest is
+convention enforced by review.
 
 ## Configure
 
