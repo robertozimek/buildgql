@@ -168,11 +168,15 @@ export default tseslint.config(
       // only inside `as unknown as` casts. The rule cannot see that use and
       // reports every one of them as unnecessary.
       '@typescript-eslint/no-unnecessary-type-parameters': 'off',
-
-      // Deliberate phantom-type attachment, documented at each site in
-      // src/runtime/builders.ts, fragment.ts and directives.ts.
-      '@typescript-eslint/no-unnecessary-type-assertion': 'off',
     },
+  },
+  {
+    // Phantom-type attachment lives here and nowhere else — builders.ts,
+    // fragment.ts and directives.ts each document why the cast is load-bearing.
+    // Scoped rather than project-wide so a genuinely redundant assertion in the
+    // client, codegen or adapters still gets reported.
+    files: ['src/runtime/**/*.ts'],
+    rules: { '@typescript-eslint/no-unnecessary-type-assertion': 'off' },
   },
   {
     files: ['test/**/*.ts'],
