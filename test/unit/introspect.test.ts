@@ -53,9 +53,9 @@ describe('loadSchema', () => {
           headers: { 'content-type': 'application/json' },
         }),
     );
-    await expect(
-      loadSchema('https://api.example.com/graphql', { fetch: fetchMock }),
-    ).rejects.toThrow(/introspection disabled/);
+    await expect(loadSchema('https://api.example.com/graphql', { fetch: fetchMock })).rejects.toThrow(
+      /introspection disabled/,
+    );
   });
 
   it('reports a helpful error when the introspection response is non-2xx', async () => {
@@ -66,9 +66,9 @@ describe('loadSchema', () => {
           headers: { 'content-type': 'text/plain' },
         }),
     );
-    await expect(
-      loadSchema('https://api.example.com/graphql', { fetch: fetchMock }),
-    ).rejects.toThrow(/api\.example\.com\/graphql.*500/);
+    await expect(loadSchema('https://api.example.com/graphql', { fetch: fetchMock })).rejects.toThrow(
+      /api\.example\.com\/graphql.*500/,
+    );
   });
 
   it('reports a helpful error when a .json file lacks __schema', async () => {

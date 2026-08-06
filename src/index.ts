@@ -3,7 +3,12 @@ export type { Client, ClientOptions, ExecuteOptions } from './client/client.js';
 export { BuildQLHttpError, GraphQLResponseError } from './client/errors.js';
 export type { GraphQLFormattedError } from './client/errors.js';
 export { sseTransport, wsTransport } from './client/subscribe.js';
-export type { SseTransportOptions, StreamChunk, SubscriptionTransport, WsTransportOptions } from './client/subscribe.js';
+export type {
+  SseTransportOptions,
+  StreamChunk,
+  SubscriptionTransport,
+  WsTransportOptions,
+} from './client/subscribe.js';
 export { args, leaf, leafArgs, object, objectArgs } from './runtime/builders.js';
 export { include, skip } from './runtime/directives.js';
 export { makeFragment, spread } from './runtime/fragment.js';

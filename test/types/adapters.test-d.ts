@@ -45,12 +45,14 @@ export { userIds, byIdVar, byIdName };
 // signatures of `ApolloClient#query`, `#mutate` and `useQuery` closely enough to prove the
 // adapter's return values drop straight in; the phantom contract they all rely on is
 // tested for real against @graphql-typed-document-node/core above.
-declare function apolloQuery<TData, TVariables>(
-  options: { query: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
-): Promise<{ data: TData }>;
-declare function apolloMutate<TData, TVariables>(
-  options: { mutation: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
-): Promise<{ data: TData }>;
+declare function apolloQuery<TData, TVariables>(options: {
+  query: CoreTypedDocumentNode<TData, TVariables>;
+  variables?: TVariables;
+}): Promise<{ data: TData }>;
+declare function apolloMutate<TData, TVariables>(options: {
+  mutation: CoreTypedDocumentNode<TData, TVariables>;
+  variables?: TVariables;
+}): Promise<{ data: TData }>;
 declare function apolloUseQuery<TData, TVariables>(
   document: CoreTypedDocumentNode<TData, TVariables>,
   options?: { variables?: TVariables },
@@ -88,9 +90,10 @@ declare function urqlClientQuery<TData, TVariables>(
   query: CoreTypedDocumentNode<TData, TVariables>,
   variables: TVariables,
 ): Promise<{ data?: TData }>;
-declare function urqlUseQuery<TData, TVariables>(
-  args: { query: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
-): [{ data?: TData }];
+declare function urqlUseQuery<TData, TVariables>(args: {
+  query: CoreTypedDocumentNode<TData, TVariables>;
+  variables?: TVariables;
+}): [{ data?: TData }];
 
 async function urqlUsage() {
   const [res] = urqlUseQuery(toUrqlArgs(UserById, { id: '7' }));

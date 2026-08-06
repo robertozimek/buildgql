@@ -26,32 +26,32 @@
 
 **Created:**
 
-| File | Responsibility |
-|---|---|
-| `src/types/varargs.ts` | Shared "does this variables map force a positional argument" types, used by both `client.ts` and the adapters. |
-| `src/adapters/document.ts` | `TypedDocumentNode<R, V>` declaration, memoised `toDocument()`, `assertKind()` guard. Internal — not a published entry point. |
-| `src/adapters/apollo.ts` | Published entry `buildql/adapters/apollo`. Apollo-shaped option objects. |
-| `src/adapters/urql.ts` | Published entry `buildql/adapters/urql`. urql-shaped option objects. |
-| `src/codegen/clients.ts` | The `ClientKind` union, its runtime value list, and the per-client emit spec (which module to import from, which names). Single source of truth shared by the emitter and the config validator. |
-| `test/types/varargs.test-d.ts` | Type test for `VarsArg`. |
-| `test/unit/adapters.test.ts` | Runtime tests for `toDocument`, apollo and urql adapters. |
-| `test/types/adapters.test-d.ts` | Type tests: variable arity, result inference, `TypedDocumentNode` interop. |
+| File                            | Responsibility                                                                                                                                                                                  |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/types/varargs.ts`          | Shared "does this variables map force a positional argument" types, used by both `client.ts` and the adapters.                                                                                  |
+| `src/adapters/document.ts`      | `TypedDocumentNode<R, V>` declaration, memoised `toDocument()`, `assertKind()` guard. Internal — not a published entry point.                                                                   |
+| `src/adapters/apollo.ts`        | Published entry `buildql/adapters/apollo`. Apollo-shaped option objects.                                                                                                                        |
+| `src/adapters/urql.ts`          | Published entry `buildql/adapters/urql`. urql-shaped option objects.                                                                                                                            |
+| `src/codegen/clients.ts`        | The `ClientKind` union, its runtime value list, and the per-client emit spec (which module to import from, which names). Single source of truth shared by the emitter and the config validator. |
+| `test/types/varargs.test-d.ts`  | Type test for `VarsArg`.                                                                                                                                                                        |
+| `test/unit/adapters.test.ts`    | Runtime tests for `toDocument`, apollo and urql adapters.                                                                                                                                       |
+| `test/types/adapters.test-d.ts` | Type tests: variable arity, result inference, `TypedDocumentNode` interop.                                                                                                                      |
 
 **Modified:**
 
-| File | Change |
-|---|---|
-| `src/client/client.ts:23-29` | Delete local `RequiredKeys`/`HasVars`, import from `src/types/varargs.ts`. |
-| `src/codegen/emit.ts:9-31,163-184` | `IMPORTS`/`REEXPORTS` consts become functions of `ClientKind`; `emit()` takes a second parameter. |
-| `src/cli/config.ts:5-14,69-85` | Add `client?: ClientKind` to `BuildQLConfig` + validation. |
-| `src/cli/index.ts:12-37` | Pass `config.client` to `emit()`; print an adapter hint. |
-| `package.json` | New `exports`/`typesVersions` subpaths, new devDependency, adapter note. |
-| `tsup.config.ts` | Two new entry points. |
-| `README.md` | "Using Apollo or urql" + "Relay" sections; adapter note under Requirements. |
-| `test/unit/emit.test.ts` | Assertions for each `ClientKind`. |
-| `test/unit/config.test.ts` | `client` validation cases. |
-| `test/unit/cli.test.ts` | End-to-end generate with `client: 'urql'`. |
-| `test/e2e/generate-and-run.test.ts` | Second generated module with `client: 'urql'`, typechecked and executed. |
+| File                                | Change                                                                                            |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `src/client/client.ts:23-29`        | Delete local `RequiredKeys`/`HasVars`, import from `src/types/varargs.ts`.                        |
+| `src/codegen/emit.ts:9-31,163-184`  | `IMPORTS`/`REEXPORTS` consts become functions of `ClientKind`; `emit()` takes a second parameter. |
+| `src/cli/config.ts:5-14,69-85`      | Add `client?: ClientKind` to `BuildQLConfig` + validation.                                        |
+| `src/cli/index.ts:12-37`            | Pass `config.client` to `emit()`; print an adapter hint.                                          |
+| `package.json`                      | New `exports`/`typesVersions` subpaths, new devDependency, adapter note.                          |
+| `tsup.config.ts`                    | Two new entry points.                                                                             |
+| `README.md`                         | "Using Apollo or urql" + "Relay" sections; adapter note under Requirements.                       |
+| `test/unit/emit.test.ts`            | Assertions for each `ClientKind`.                                                                 |
+| `test/unit/config.test.ts`          | `client` validation cases.                                                                        |
+| `test/unit/cli.test.ts`             | End-to-end generate with `client: 'urql'`.                                                        |
+| `test/e2e/generate-and-run.test.ts` | Second generated module with `client: 'urql'`, typechecked and executed.                          |
 
 ### Design notes the implementer needs
 
@@ -69,9 +69,9 @@ Apollo Client and urql both consume that phantom `__apiType` property structural
 
 **Why `parse()` is a static import, not a dynamic one.** A dynamic `await import('graphql')` would make every adapter function async, which poisons the whole API. `src/adapters/*` therefore imports `parse` statically. Because these are separate entry points, `graphql` is only loaded when a user actually imports an adapter — the root `buildql` entry stays dependency-free. The cost is that a missing `graphql` surfaces as Node's own `ERR_MODULE_NOT_FOUND` ("Cannot find package 'graphql'") rather than a `buildql:`-prefixed message. That is acceptable and is documented in the README.
 
-**Why the apollo adapter has kind guards and urql's does not.** Apollo uses a different option key per operation type (`{ query }` for `client.query`/`client.subscribe`, `{ mutation }` for `client.mutate`), so passing the wrong kind is a real mistake worth catching early. urql uses `{ query, variables }` for queries, mutations *and* subscriptions alike, so there is nothing to guard.
+**Why the apollo adapter has kind guards and urql's does not.** Apollo uses a different option key per operation type (`{ query }` for `client.query`/`client.subscribe`, `{ mutation }` for `client.mutate`), so passing the wrong kind is a real mistake worth catching early. urql uses `{ query, variables }` for queries, mutations _and_ subscriptions alike, so there is nothing to guard.
 
-**Testing against real client libraries.** Only `@graphql-typed-document-node/core` is added as a devDependency — it is a types-only, three-interface package that has not changed since 2022, and it *is* the contract Apollo's `DocumentNode | TypedDocumentNode<...>` and urql's `DocumentInput<Data, Variables>` are both built from. Apollo's and urql's own packages are deliberately not installed: they are heavy, fast-moving, and have restructured their entry points between major versions, which would make the type tests fragile for no extra coverage. The Apollo/urql call shapes are instead pinned by local `declare function` mirrors of their public signatures, documented inline.
+**Testing against real client libraries.** Only `@graphql-typed-document-node/core` is added as a devDependency — it is a types-only, three-interface package that has not changed since 2022, and it _is_ the contract Apollo's `DocumentNode | TypedDocumentNode<...>` and urql's `DocumentInput<Data, Variables>` are both built from. Apollo's and urql's own packages are deliberately not installed: they are heavy, fast-moving, and have restructured their entry points between major versions, which would make the type tests fragile for no extra coverage. The Apollo/urql call shapes are instead pinned by local `declare function` mirrors of their public signatures, documented inline.
 
 **A generic `buildql/adapters` entry point is intentionally not created.** The public surface is per-client only. `toDocument` exists as shared internals; if a generic entry is wanted later it is a one-line export map addition.
 
@@ -82,11 +82,13 @@ Apollo Client and urql both consume that phantom `__apiType` property structural
 Extracts the "must the caller pass a `vars` argument?" logic out of `src/client/client.ts` so the adapters can reuse it instead of copying it. Pure refactor plus one new exported alias — no behaviour change.
 
 **Files:**
+
 - Create: `src/types/varargs.ts`
 - Create: `test/types/varargs.test-d.ts`
 - Modify: `src/client/client.ts:23-29`
 
 **Interfaces:**
+
 - Consumes: nothing.
 - Produces:
   - `type RequiredKeys<V>` — keys of `V` that are not optional.
@@ -163,7 +165,10 @@ import type { HasVars } from '../types/varargs.js';
 Then replace lines 23-29 — the local `RequiredKeys`, `HasVars` and `VarArgs` block — with just:
 
 ```ts
-type VarArgs<V> = HasVars<V> extends true ? [vars: NoInfer<V>, opts?: ExecuteOptions] : [vars?: NoInfer<V>, opts?: ExecuteOptions];
+type VarArgs<V> =
+  HasVars<V> extends true
+    ? [vars: NoInfer<V>, opts?: ExecuteOptions]
+    : [vars?: NoInfer<V>, opts?: ExecuteOptions];
 ```
 
 The `RequiredKeys` and `HasVars` declarations (and their comments, which now live in `varargs.ts`) are deleted from `client.ts`.
@@ -187,12 +192,14 @@ git commit -m "refactor: extract shared variable-arity types for reuse by adapte
 The shared machinery every adapter sits on: a `TypedDocumentNode<R, V>` declaration, a memoised parse of the operation's already-printed document, and a kind guard.
 
 **Files:**
+
 - Create: `src/adapters/document.ts`
 - Create: `test/unit/adapters.test.ts`
 - Create: `test/types/adapters.test-d.ts`
 - Modify: `package.json` (devDependencies)
 
 **Interfaces:**
+
 - Consumes: `Operation<R, V>` from `src/runtime/operation.js` — `{ kind, name, document, sels }`.
 - Produces:
   - `interface TypedDocumentNode<R, V> extends DocumentNode { __apiType?: (variables: V) => R }`
@@ -232,12 +239,7 @@ export const query = makeQuery({
   user: objectArgs('user', ['!'], User, args<{ id: string }>({ id: 'ID!' })),
 });
 export const mutation = makeMutation({
-  createUser: objectArgs(
-    'createUser',
-    ['!'],
-    User,
-    args<{ name: string }>({ name: 'String!' }),
-  ),
+  createUser: objectArgs('createUser', ['!'], User, args<{ name: string }>({ name: 'String!' })),
 });
 export const subscription = makeSubscription({
   ticks: leafArgs<'ticks', ['!'], string, { room?: string }>(
@@ -400,7 +402,7 @@ export { userIds, byIdVar, byIdName };
 Run: `npm run test:types`
 Expected: PASS
 
-`acceptsCoreDocument` recovers `R` and `V` by inferring through the *optional* `__apiType`
+`acceptsCoreDocument` recovers `R` and `V` by inferring through the _optional_ `__apiType`
 property. If that inference does not land, `R`/`V` resolve to `unknown` and the failure
 shows up as `Property 'users' does not exist on type 'unknown'` on the next line — not as
 an assignability error. Should that happen, replace the probe with a direct annotated
@@ -423,11 +425,13 @@ git commit -m "feat(adapters): memoised TypedDocumentNode conversion for GraphQL
 ## Task 3: Apollo Client adapter
 
 **Files:**
+
 - Create: `src/adapters/apollo.ts`
 - Modify: `test/unit/adapters.test.ts` (append)
 - Modify: `test/types/adapters.test-d.ts` (append)
 
 **Interfaces:**
+
 - Consumes: `toDocument`, `assertKind`, `TypedDocumentNode` from `src/adapters/document.js`; `VarsArg` from `src/types/varargs.js`; `Operation` from `src/runtime/operation.js`.
 - Produces (published as `buildql/adapters/apollo` in Task 6):
   - `interface ApolloQueryArgs<R, V> { readonly query: TypedDocumentNode<R, V>; readonly variables: V }`
@@ -565,12 +569,14 @@ Then append:
 // signatures of `ApolloClient#query`, `#mutate` and `useQuery` closely enough to prove the
 // adapter's return values drop straight in; the phantom contract they all rely on is
 // tested for real against @graphql-typed-document-node/core above.
-declare function apolloQuery<TData, TVariables>(
-  options: { query: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
-): Promise<{ data: TData }>;
-declare function apolloMutate<TData, TVariables>(
-  options: { mutation: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
-): Promise<{ data: TData }>;
+declare function apolloQuery<TData, TVariables>(options: {
+  query: CoreTypedDocumentNode<TData, TVariables>;
+  variables?: TVariables;
+}): Promise<{ data: TData }>;
+declare function apolloMutate<TData, TVariables>(options: {
+  mutation: CoreTypedDocumentNode<TData, TVariables>;
+  variables?: TVariables;
+}): Promise<{ data: TData }>;
 declare function apolloUseQuery<TData, TVariables>(
   document: CoreTypedDocumentNode<TData, TVariables>,
   options?: { variables?: TVariables },
@@ -619,11 +625,13 @@ git commit -m "feat(adapters): Apollo Client adapter"
 ## Task 4: urql adapter
 
 **Files:**
+
 - Create: `src/adapters/urql.ts`
 - Modify: `test/unit/adapters.test.ts` (append)
 - Modify: `test/types/adapters.test-d.ts` (append)
 
 **Interfaces:**
+
 - Consumes: `toDocument`, `TypedDocumentNode` from `src/adapters/document.js`; `VarsArg` from `src/types/varargs.js`; `Operation` from `src/runtime/operation.js`. (No `assertKind` — urql is kind-agnostic.)
 - Produces (published as `buildql/adapters/urql` in Task 6):
   - `interface UrqlArgs<R, V> { readonly query: TypedDocumentNode<R, V>; readonly variables: V }`
@@ -733,9 +741,10 @@ declare function urqlClientQuery<TData, TVariables>(
   query: CoreTypedDocumentNode<TData, TVariables>,
   variables: TVariables,
 ): Promise<{ data?: TData }>;
-declare function urqlUseQuery<TData, TVariables>(
-  args: { query: CoreTypedDocumentNode<TData, TVariables>; variables?: TVariables },
-): [{ data?: TData }];
+declare function urqlUseQuery<TData, TVariables>(args: {
+  query: CoreTypedDocumentNode<TData, TVariables>;
+  variables?: TVariables;
+}): [{ data?: TData }];
 
 async function urqlUsage() {
   const [res] = urqlUseQuery(toUrqlArgs(UserById, { id: '7' }));
@@ -778,11 +787,13 @@ git commit -m "feat(adapters): urql adapter"
 Teaches the code generator which client the generated module should bind to. The registry is a standalone module so the config validator (Task 6) and the emitter agree on the list of valid values without either importing the other.
 
 **Files:**
+
 - Create: `src/codegen/clients.ts`
 - Modify: `src/codegen/emit.ts:9-31` and `:163-184`
 - Modify: `test/unit/emit.test.ts` (append a `describe` block)
 
 **Interfaces:**
+
 - Consumes: nothing new.
 - Produces:
   - `type ClientKind = 'buildql' | 'apollo' | 'urql' | 'none'`
@@ -945,7 +956,7 @@ export function emit(ir: IRSchema, client: ClientKind = 'buildql'): string {
 and, at the end of the function, replace `parts.push(REEXPORTS);` with:
 
 ```ts
-  parts.push(reexportBlock(client));
+parts.push(reexportBlock(client));
 ```
 
 - [ ] **Step 5: Run the emitter tests to verify they pass**
@@ -970,12 +981,14 @@ git commit -m "feat(codegen): bind the generated module to a configurable GraphQ
 ## Task 6: Config field and CLI plumbing
 
 **Files:**
+
 - Modify: `src/cli/config.ts:5-14` (the `BuildQLConfig` interface) and `:69-85` (`assertBuildQLConfig`)
 - Modify: `src/cli/index.ts:12-37` (`generate`)
 - Modify: `test/unit/config.test.ts` (append)
 - Modify: `test/unit/cli.test.ts` (append)
 
 **Interfaces:**
+
 - Consumes: `ClientKind`, `CLIENT_KINDS`, `CLIENT_EMITS`, `isClientKind` from `src/codegen/clients.js`; `emit(ir, client)` from `src/codegen/emit.js`.
 - Produces: `BuildQLConfig.client?: ClientKind`; `src/cli/config.ts` re-exports `ClientKind` so `defineConfig` users get the union in their editor.
 
@@ -984,42 +997,42 @@ git commit -m "feat(codegen): bind the generated module to a configurable GraphQ
 Append to `test/unit/config.test.ts`, inside the existing `describe('loadConfig', ...)` block:
 
 ```ts
-  it('accepts a valid client', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(
-      join(dir, 'buildql.config.mjs'),
-      "export default { schema: './schema.graphql', client: 'apollo' };\n",
-    );
-    const { config } = await loadConfig(dir);
-    expect(config.client).toBe('apollo');
-  });
+it('accepts a valid client', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+  await writeFile(
+    join(dir, 'buildql.config.mjs'),
+    "export default { schema: './schema.graphql', client: 'apollo' };\n",
+  );
+  const { config } = await loadConfig(dir);
+  expect(config.client).toBe('apollo');
+});
 
-  it('leaves client undefined when it is not set', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
-    const { config } = await loadConfig(dir);
-    expect(config.client).toBeUndefined();
-  });
+it('leaves client undefined when it is not set', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+  await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+  const { config } = await loadConfig(dir);
+  expect(config.client).toBeUndefined();
+});
 
-  it('errors clearly on an unknown client, naming the valid values', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(
-      join(dir, 'buildql.config.mjs'),
-      "export default { schema: './schema.graphql', client: 'relay' };\n",
-    );
-    await expect(loadConfig(dir)).rejects.toThrow(
-      /buildql:.*"client" must be one of "buildql", "apollo", "urql", "none"/,
-    );
-  });
+it('errors clearly on an unknown client, naming the valid values', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+  await writeFile(
+    join(dir, 'buildql.config.mjs'),
+    "export default { schema: './schema.graphql', client: 'relay' };\n",
+  );
+  await expect(loadConfig(dir)).rejects.toThrow(
+    /buildql:.*"client" must be one of "buildql", "apollo", "urql", "none"/,
+  );
+});
 
-  it('errors clearly when client is not a string', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(
-      join(dir, 'buildql.config.mjs'),
-      "export default { schema: './schema.graphql', client: 42 };\n",
-    );
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"client"/);
-  });
+it('errors clearly when client is not a string', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+  await writeFile(
+    join(dir, 'buildql.config.mjs'),
+    "export default { schema: './schema.graphql', client: 42 };\n",
+  );
+  await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"client"/);
+});
 ```
 
 - [ ] **Step 2: Run the tests to verify they fail**
@@ -1052,11 +1065,11 @@ Add the field to `BuildQLConfig`, after `scalars`:
 Add the check to `assertBuildQLConfig`, after the `scalars` check:
 
 ```ts
-  if (value.client !== undefined && !isClientKind(value.client)) {
-    throw new Error(
-      `buildql: ${name}'s "client" must be one of ${CLIENT_KINDS.map((k) => `"${k}"`).join(', ')}`,
-    );
-  }
+if (value.client !== undefined && !isClientKind(value.client)) {
+  throw new Error(
+    `buildql: ${name}'s "client" must be one of ${CLIENT_KINDS.map((k) => `"${k}"`).join(', ')}`,
+  );
+}
 ```
 
 - [ ] **Step 4: Run the config tests to verify they pass**
@@ -1111,16 +1124,16 @@ import { CLIENT_EMITS } from '../codegen/clients.js';
 In `generate`, replace `const src = emit(ir);` with:
 
 ```ts
-  const client = config.client ?? 'buildql';
-  const { module, names } = CLIENT_EMITS[client];
-  if (module && module !== 'buildql') {
-    process.stdout.write(
-      `buildql: client "${client}" — the generated module re-exports ${names.join(', ')} ` +
-        `from ${module} (requires the "graphql" package)\n`,
-    );
-  }
+const client = config.client ?? 'buildql';
+const { module, names } = CLIENT_EMITS[client];
+if (module && module !== 'buildql') {
+  process.stdout.write(
+    `buildql: client "${client}" — the generated module re-exports ${names.join(', ')} ` +
+      `from ${module} (requires the "graphql" package)\n`,
+  );
+}
 
-  const src = emit(ir, client);
+const src = emit(ir, client);
 ```
 
 - [ ] **Step 8: Run the CLI test to verify it passes**
@@ -1147,10 +1160,12 @@ git commit -m "feat(config): add the \"client\" option and wire it through the C
 Publishes the two adapters as importable subpaths. Without this, the module specifiers the generator now emits do not resolve for installed users.
 
 **Files:**
+
 - Modify: `tsup.config.ts`
 - Modify: `package.json` (`exports`, `typesVersions`)
 
 **Interfaces:**
+
 - Consumes: `src/adapters/apollo.ts`, `src/adapters/urql.ts`.
 - Produces: resolvable `buildql/adapters/apollo` and `buildql/adapters/urql` specifiers, matching what `CLIENT_EMITS` emits.
 
@@ -1208,12 +1223,14 @@ grep -cE "(from|require\()[\"']graphql[\"']" dist/adapters/apollo.js dist/adapte
 ```
 
 Expected:
+
 ```
 apolloDocument,toApolloMutation,toApolloQuery
 toUrqlArgs,urqlDocument
 dist/adapters/apollo.js:1
 dist/adapters/apollo.cjs:1
 ```
+
 A `grep` count of `0` would mean `graphql` was inlined into the bundle instead of left
 external — that is a failure.
 
@@ -1245,9 +1262,11 @@ git commit -m "build: publish buildql/adapters/apollo and buildql/adapters/urql 
 Proves a `client: 'urql'` generated module type-checks under strict `tsc` and its operations execute against a real server — the same bar the default client is already held to.
 
 **Files:**
+
 - Modify: `test/e2e/generate-and-run.test.ts`
 
 **Interfaces:**
+
 - Consumes: `generate` from `src/cli/index.js`; `startServer` from `test/e2e/fixtures/server.js`; `toUrqlArgs` from `src/adapters/urql.js`.
 - Produces: nothing consumed by later tasks.
 
@@ -1328,7 +1347,10 @@ toUrqlArgs(byStatus, { status: 'ARCHIVED' });
   const mod = (await import(pathToFileURL(urqlUsageFile).href)) as {
     readonly q: Operation<PostsResult, {}>;
     readonly byStatus: Operation<ByStatusResult, { status: 'DRAFT' | 'PUBLISHED' }>;
-    readonly withVars: { query: { kind: string; definitions: readonly unknown[] }; variables: { status: string } };
+    readonly withVars: {
+      query: { kind: string; definitions: readonly unknown[] };
+      variables: { status: string };
+    };
     readonly noVars: { query: { kind: string }; variables: Record<string, never> };
     readonly doc: { kind: string };
   };
@@ -1382,9 +1404,11 @@ git commit -m "test(e2e): generate and run a urql-bound module against a live sc
 ## Task 9: Documentation
 
 **Files:**
+
 - Modify: `README.md` — the `## Configure` section, plus two new sections and a Requirements bullet.
 
 **Interfaces:**
+
 - Consumes: the public API from Tasks 3, 4 and 6.
 - Produces: nothing.
 

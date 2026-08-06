@@ -18,7 +18,9 @@ const mutation = makeMutation({
 });
 const client = createClient({ url: 'http://localhost/graphql' });
 
-const m = mutation('CreateNewUser', ($, M) => [M.createUser({ name: $.name, email: $.email }, (U) => [U.id])]);
+const m = mutation('CreateNewUser', ($, M) => [
+  M.createUser({ name: $.name, email: $.email }, (U) => [U.id]),
+]);
 const q = query('Users', ($, Q) => [Q.users((U) => [U.id, U.lastName])]);
 
 // A query whose only variable comes from an OPTIONAL argument. `HasVars` must key off
@@ -27,7 +29,11 @@ const q = query('Users', ($, Q) => [Q.users((U) => [U.id, U.lastName])]);
 // `keyof V extends never` version of `HasVars`, which can't distinguish `{ note?: T }`
 // from `{ note: T }`).
 const optionalOnlyQuery = makeQuery({
-  echo: leafArgs<'echo', ['!'], string, { note?: string }>('echo', ['!'], args<{ note?: string }>({ note: 'String' })),
+  echo: leafArgs<'echo', ['!'], string, { note?: string }>(
+    'echo',
+    ['!'],
+    args<{ note?: string }>({ note: 'String' }),
+  ),
 })('Echo', ($, Q) => [Q.echo({ note: $.note })]);
 const optionalClient = createClient({ url: 'http://localhost/graphql' });
 

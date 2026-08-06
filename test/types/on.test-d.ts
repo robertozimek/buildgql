@@ -26,7 +26,10 @@ type PetR = NonNullable<(typeof q)[typeof RESULT]>['pet'];
 
 // common fields are distributed across every branch
 type _1 = Expect<
-  Eq<PetR, { name: string; breed: string; __typename: 'Dog' } | { name: string; lives: number; __typename: 'Cat' }>
+  Eq<
+    PetR,
+    { name: string; breed: string; __typename: 'Dog' } | { name: string; lives: number; __typename: 'Cat' }
+  >
 >;
 
 // and it narrows on __typename

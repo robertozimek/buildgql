@@ -28,9 +28,7 @@ describe('printOperation', () => {
     const doc = printOperation('query', 'Posts', [
       Root.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.firstName, A.lastName])]),
     ]);
-    expect(doc).toBe(
-      'query Posts { posts { id title author { id firstName lastName } } }',
-    );
+    expect(doc).toBe('query Posts { posts { id title author { id firstName lastName } } }');
   });
 
   it('prints aliases', () => {
@@ -84,16 +82,9 @@ describe('printOperation', () => {
 
   it('serialises object and list literals', () => {
     const F = {
-      f: objectArgs(
-        'f',
-        ['!'],
-        User,
-        args<{ where: { ids: string[]; ok: boolean } }>({ where: 'Filter!' }),
-      ),
+      f: objectArgs('f', ['!'], User, args<{ where: { ids: string[]; ok: boolean } }>({ where: 'Filter!' })),
     };
-    const doc = printOperation('query', 'Q', [
-      F.f({ where: { ids: ['a', 'b'], ok: true } }, (U) => [U.id]),
-    ]);
+    const doc = printOperation('query', 'Q', [F.f({ where: { ids: ['a', 'b'], ok: true } }, (U) => [U.id])]);
     expect(doc).toBe('query Q { f(where: {ids: ["a", "b"], ok: true}) { id } }');
   });
 
@@ -103,10 +94,9 @@ describe('printOperation', () => {
         'f',
         ['!'],
         User,
-        args<{ status: 'ACTIVE' | 'BANNED'; name: string }>(
-          { status: 'Status!', name: 'String!' },
-          ['status'],
-        ),
+        args<{ status: 'ACTIVE' | 'BANNED'; name: string }>({ status: 'Status!', name: 'String!' }, [
+          'status',
+        ]),
       ),
     };
     const doc = printOperation('query', 'Q', [F.f({ status: 'ACTIVE', name: 'Ada' }, (U) => [U.id])]);

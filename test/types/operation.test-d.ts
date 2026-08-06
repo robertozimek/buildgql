@@ -29,9 +29,7 @@ const Mutation = {
 const query = makeQuery(Query);
 const mutation = makeMutation(Mutation);
 
-const q = query('Posts', ($, Q) => [
-  Q.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.lastName])]),
-]);
+const q = query('Posts', ($, Q) => [Q.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.lastName])])]);
 type _1 = Expect<
   Eq<
     NonNullable<(typeof q)[typeof RESULT]>,
@@ -44,6 +42,8 @@ const m = mutation('CreateNewUser', ($, M) => [
   M.createUser({ name: $.name, email: $.email }, (U) => [U.id, U.firstName]),
 ]);
 type _3 = Expect<Eq<NonNullable<(typeof m)[typeof VARS]>, { name: string; email: string }>>;
-type _4 = Expect<Eq<NonNullable<(typeof m)[typeof RESULT]>, { createUser: { id: string; firstName: string } }>>;
+type _4 = Expect<
+  Eq<NonNullable<(typeof m)[typeof RESULT]>, { createUser: { id: string; firstName: string } }>
+>;
 
 export { q, m };

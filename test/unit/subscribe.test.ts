@@ -41,7 +41,11 @@ it('yields each SSE next event as typed data', async () => {
 
 it('handles a data event split across chunk boundaries', async () => {
   const fetchMock = vi.fn<typeof fetch>(async () =>
-    sseResponse(['event: next\ndata: {"data":{"mess', 'ages":{"id":"1"}}}\n\n', 'event: complete\ndata: \n\n']),
+    sseResponse([
+      'event: next\ndata: {"data":{"mess',
+      'ages":{"id":"1"}}}\n\n',
+      'event: complete\ndata: \n\n',
+    ]),
   );
   const client = createClient({
     url: 'http://x/graphql',

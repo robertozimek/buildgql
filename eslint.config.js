@@ -34,7 +34,11 @@ export default tseslint.config(
         { selector: 'typeLike', format: ['PascalCase'] },
         { selector: 'interface', format: ['PascalCase'], custom: { regex: '^I[A-Z]', match: false } },
         { selector: 'function', format: ['camelCase'] },
-        { selector: 'variable', format: ['camelCase', 'UPPER_CASE', 'PascalCase'], leadingUnderscore: 'allow' },
+        {
+          selector: 'variable',
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
         { selector: 'parameter', format: ['camelCase'], leadingUnderscore: 'allow' },
         // Object literal keys are GraphQL field names and wire-protocol keys
         // (`__typename`, `content-type`, `connection_init`) — not ours to rename.

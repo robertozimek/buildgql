@@ -268,9 +268,36 @@ describe('unmappedScalars', () => {
           },
         ],
       },
-      { name: 'DateTime', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
-      { name: 'JSON', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
-      { name: 'String', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
+      {
+        name: 'DateTime',
+        kind: 'scalar',
+        description: null,
+        possibleTypes: [],
+        interfaces: [],
+        enumValues: [],
+        inputFields: [],
+        fields: [],
+      },
+      {
+        name: 'JSON',
+        kind: 'scalar',
+        description: null,
+        possibleTypes: [],
+        interfaces: [],
+        enumValues: [],
+        inputFields: [],
+        fields: [],
+      },
+      {
+        name: 'String',
+        kind: 'scalar',
+        description: null,
+        possibleTypes: [],
+        interfaces: [],
+        enumValues: [],
+        inputFields: [],
+        fields: [],
+      },
     ],
   };
 
@@ -279,7 +306,10 @@ describe('unmappedScalars', () => {
   });
 
   it('does not flag scalars covered by the default or configured mapping', () => {
-    const mapped: IRSchema = { ...schema, scalars: { ...DEFAULT_SCALARS, DateTime: 'string', JSON: 'unknown' } };
+    const mapped: IRSchema = {
+      ...schema,
+      scalars: { ...DEFAULT_SCALARS, DateTime: 'string', JSON: 'unknown' },
+    };
     expect(unmappedScalars(mapped)).toEqual([]);
   });
 
@@ -292,7 +322,16 @@ describe('unmappedScalars', () => {
       ...schema,
       types: [
         ...schema.types,
-        { name: 'toString', kind: 'scalar', description: null, possibleTypes: [], interfaces: [], enumValues: [], inputFields: [], fields: [] },
+        {
+          name: 'toString',
+          kind: 'scalar',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [],
+        },
       ],
     };
     expect(unmappedScalars(withProtoNamedScalar)).toEqual(['DateTime', 'JSON', 'toString']);
@@ -307,9 +346,9 @@ describe('emit — client option', () => {
     // what the emitter produced before this feature existed, and a `toContain` on a single
     // line would pass even if the sorted list were reordered around it.
     expect(src).toContain(
-      "import {\n  args,\n  createClient,\n  include,\n  leaf,\n  leafArgs,\n  makeFragment,\n" +
-      "  makeMutation,\n  makeQuery,\n  makeSubscription,\n  object,\n  objectArgs,\n  on,\n" +
-      "  skip,\n  spread,\n  $,\n  v,\n} from 'buildql';\n",
+      'import {\n  args,\n  createClient,\n  include,\n  leaf,\n  leafArgs,\n  makeFragment,\n' +
+        '  makeMutation,\n  makeQuery,\n  makeSubscription,\n  object,\n  objectArgs,\n  on,\n' +
+        "  skip,\n  spread,\n  $,\n  v,\n} from 'buildql';\n",
     );
     expect(src).toContain('  createClient,\n');
     expect(src).toContain('export { $, v, on, spread, include, skip, createClient };');

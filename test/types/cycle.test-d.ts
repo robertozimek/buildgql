@@ -21,9 +21,7 @@ const User = {
 const query = makeQuery({ posts: object('posts', ['!', 'l', '!'], Post) });
 
 // two levels through the cycle: Post -> User -> Post
-const q = query('Q', ($, Q) => [
-  Q.posts((P) => [P.id, P.author((A) => [A.id, A.posts((P2) => [P2.id])])]),
-]);
+const q = query('Q', ($, Q) => [Q.posts((P) => [P.id, P.author((A) => [A.id, A.posts((P2) => [P2.id])])])]);
 type _1 = Expect<
   Eq<
     NonNullable<(typeof q)[typeof RESULT]>,

@@ -18,37 +18,37 @@ Every task's requirements implicitly include this section.
 - **Type-performance budget is a hard gate:** `npm run test:perf` enforces ≤ 25,000 instantiations and ≤ 3s check time on `test/perf/generated.ts`. Do not add generic indirection to `src/types/**` or `src/runtime/builders.ts` without re-running it.
 - **Every deliberate cast keeps its explanatory comment.** The `as unknown as` casts in `builders.ts`, `fragment.ts`, and `directives.ts` are phantom-type attachments and are already documented. Renaming may reflow those comments; deleting them is a regression.
 - **Error messages stay `buildql:`-prefixed.** Every `throw new Error` and every `process.std*` write in `src/` begins with the literal `buildql: `.
-- **The generated module's default (`client: 'buildql'`) import block stays a single merged, sorted `from 'buildql'` statement** with `$` and `v` pinned last — see the comment on `importBlock` in `src/codegen/emit.ts`. The *names* in it change in Task 5; the shape does not.
+- **The generated module's default (`client: 'buildql'`) import block stays a single merged, sorted `from 'buildql'` statement** with `$` and `v` pinned last — see the comment on `importBlock` in `src/codegen/emit.ts`. The _names_ in it change in Task 5; the shape does not.
 - **`npm run check` (`test:types` + `test` + `test:perf`) and `npm run lint` MUST pass at the end of every task.**
 
 ## Naming Decisions (reference for all tasks)
 
 Settled once here so later tasks don't drift. The package is **not published to npm** (`npm view buildql` → 404), so public renames cost nothing externally.
 
-| Current | New | Why |
-|---|---|---|
-| `Node` (type) | `SelectionNode` | `Node` collides with DOM `Node`, which is in `lib` |
-| `AnySel` | `AnyFieldSelection` | spells out what it is |
-| `Sel<N,R,V,O>` | `FieldSelection<N,R,V,O>` | ditto |
-| `On<TN,R,V>` (type) | `InlineFragment<TN,R,V>` | `On` is meaningless as an exported type |
-| `Spread<R,V>` | `FragmentSpread<R,V>` | matches GraphQL vocabulary |
-| `SpreadTarget` | `FragmentDefinition` | it *is* a fragment definition |
-| `FragmentDef` (alias in `print.ts`) | **deleted** | pure alias of the above |
-| `FragmentHandle<R,V>` | `Fragment<R,V>` | `spread(fragment)` reads better |
-| `Spread.handle` | `FragmentSpread.fragment` | ditto |
-| `DirectiveNode` | `Directive` | collides with graphql-js `DirectiveNode` |
-| `args()` | `argSpec()` | returns an `ArgSpec`; `args` is too generic for a root export |
-| `leaf()` | `leafField()` | consistent `<kind>Field[Args]` family |
-| `leafArgs()` | `leafFieldArgs()` | ditto |
-| `object()` | `objectField()` | `object` is far too generic for a root export |
-| `objectArgs()` | `objectFieldArgs()` | ditto |
-| `GraphQLResponseError` | `BuildQLResponseError` | consistent `BuildQL` prefix |
-| — | `BuildQLError` (new abstract base) | lets consumers write one `instanceof` |
-| `src/types/node.ts` | `src/types/selection.ts` | file follows the type |
-| `src/types/varargs.ts` | **merged into** `src/types/vars.ts` | both describe variables |
-| `src/client/client.ts` | `src/client/create-client.ts` + `src/client/index.ts` | removes the `client/client` stutter |
+| Current                             | New                                                   | Why                                                           |
+| ----------------------------------- | ----------------------------------------------------- | ------------------------------------------------------------- |
+| `Node` (type)                       | `SelectionNode`                                       | `Node` collides with DOM `Node`, which is in `lib`            |
+| `AnySel`                            | `AnyFieldSelection`                                   | spells out what it is                                         |
+| `Sel<N,R,V,O>`                      | `FieldSelection<N,R,V,O>`                             | ditto                                                         |
+| `On<TN,R,V>` (type)                 | `InlineFragment<TN,R,V>`                              | `On` is meaningless as an exported type                       |
+| `Spread<R,V>`                       | `FragmentSpread<R,V>`                                 | matches GraphQL vocabulary                                    |
+| `SpreadTarget`                      | `FragmentDefinition`                                  | it _is_ a fragment definition                                 |
+| `FragmentDef` (alias in `print.ts`) | **deleted**                                           | pure alias of the above                                       |
+| `FragmentHandle<R,V>`               | `Fragment<R,V>`                                       | `spread(fragment)` reads better                               |
+| `Spread.handle`                     | `FragmentSpread.fragment`                             | ditto                                                         |
+| `DirectiveNode`                     | `Directive`                                           | collides with graphql-js `DirectiveNode`                      |
+| `args()`                            | `argSpec()`                                           | returns an `ArgSpec`; `args` is too generic for a root export |
+| `leaf()`                            | `leafField()`                                         | consistent `<kind>Field[Args]` family                         |
+| `leafArgs()`                        | `leafFieldArgs()`                                     | ditto                                                         |
+| `object()`                          | `objectField()`                                       | `object` is far too generic for a root export                 |
+| `objectArgs()`                      | `objectFieldArgs()`                                   | ditto                                                         |
+| `GraphQLResponseError`              | `BuildQLResponseError`                                | consistent `BuildQL` prefix                                   |
+| —                                   | `BuildQLError` (new abstract base)                    | lets consumers write one `instanceof`                         |
+| `src/types/node.ts`                 | `src/types/selection.ts`                              | file follows the type                                         |
+| `src/types/varargs.ts`              | **merged into** `src/types/vars.ts`                   | both describe variables                                       |
+| `src/client/client.ts`              | `src/client/create-client.ts` + `src/client/index.ts` | removes the `client/client` stutter                           |
 
-**Function naming rule:** `makeX` = returns a *builder function*; `toX` = pure conversion; `isX` = type-guard predicate; `assertX` = throws or narrows; `collectX` = walks a tree accumulating. All existing code already follows this — keep it.
+**Function naming rule:** `makeX` = returns a _builder function_; `toX` = pure conversion; `isX` = type-guard predicate; `assertX` = throws or narrows; `collectX` = walks a tree accumulating. All existing code already follows this — keep it.
 
 **File naming rule:** kebab-case, one responsibility per file. Enforced by `unicorn/filename-case` in Task 1.
 
@@ -59,6 +59,7 @@ Settled once here so later tasks don't drift. The package is **not published to 
 Nothing mechanically enforces any convention today — no ESLint, no Prettier, no `.editorconfig`, no `lint` script, and CI runs only `check` + `build`. This lands first so every later task is gated by it.
 
 **Files:**
+
 - Create: `eslint.config.js`
 - Create: `.prettierrc.json`
 - Create: `.prettierignore`
@@ -66,6 +67,7 @@ Nothing mechanically enforces any convention today — no ESLint, no Prettier, n
 - Modify: `.github/workflows/ci.yml`
 
 **Interfaces:**
+
 - Consumes: nothing
 - Produces: `npm run lint` (ESLint, zero warnings tolerated) and `npm run format:check` (Prettier), both wired into `npm run check`. Later tasks rely on these existing.
 
@@ -146,7 +148,11 @@ export default tseslint.config(
         { selector: 'typeLike', format: ['PascalCase'] },
         { selector: 'interface', format: ['PascalCase'], custom: { regex: '^I[A-Z]', match: false } },
         { selector: 'function', format: ['camelCase'] },
-        { selector: 'variable', format: ['camelCase', 'UPPER_CASE', 'PascalCase'], leadingUnderscore: 'allow' },
+        {
+          selector: 'variable',
+          format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
+          leadingUnderscore: 'allow',
+        },
         { selector: 'parameter', format: ['camelCase'], leadingUnderscore: 'allow' },
         // Object literal keys are GraphQL field names and wire-protocol keys
         // (`__typename`, `content-type`, `connection_init`) — not ours to rename.
@@ -226,7 +232,7 @@ if (isEntrypoint(import.meta.url, process.argv[1])) {
 }
 ```
 
-**`@typescript-eslint/no-misused-promises`** on `socket.onopen = async () => {...}` in `src/client/subscribe.ts:125` — an async function assigned to a void-returning handler. The pattern is deliberate and already documented there (the body awaits `connectionParams()` and routes any throw through the failure path precisely *because* nothing awaits `onopen`). Add a targeted disable that says so:
+**`@typescript-eslint/no-misused-promises`** on `socket.onopen = async () => {...}` in `src/client/subscribe.ts:125` — an async function assigned to a void-returning handler. The pattern is deliberate and already documented there (the body awaits `connectionParams()` and routes any throw through the failure path precisely _because_ nothing awaits `onopen`). Add a targeted disable that says so:
 
 ```ts
       // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the async
@@ -262,8 +268,8 @@ git commit -m "style: apply prettier formatting"
 `npm run check` now includes lint and format, so CI needs no new step — but pin the intent by naming it. Replace the `- run: npm run check` line in `.github/workflows/ci.yml` with:
 
 ```yaml
-      - run: npm run check
-        name: Lint, format, types, tests, type-perf budget
+- run: npm run check
+  name: Lint, format, types, tests, type-perf budget
 ```
 
 - [ ] **Step 8: Verify and commit**
@@ -283,11 +289,13 @@ git commit -m "ci: name the check step for what it now covers"
 Measured fallout: exactly **2 errors, both in `src/`**. (`noUncheckedIndexedAccess` is deliberately NOT enabled here — see Task 3.)
 
 **Files:**
+
 - Modify: `tsconfig.json:8`
 - Modify: `src/codegen/introspect.ts:83-86`
 - Modify: `src/client/client.ts:57-66`
 
 **Interfaces:**
+
 - Consumes: Task 1's `npm run lint`
 - Produces: the project convention that an optional property which may legitimately receive an explicit `undefined` is declared `?: T | undefined`, not `?: T`.
 
@@ -322,17 +330,17 @@ export interface LoadOptions {
 `RequestInit.signal` is typed `AbortSignal | null`, and `opts?.signal` is `AbortSignal | undefined`. In `src/client/client.ts`, in the `doFetch` call inside `execute`, change the `signal` line:
 
 ```ts
-      const res = await doFetch(options.url, {
-        method: 'POST',
-        headers,
-        // `RequestInit.signal` is `AbortSignal | null`; `??` bridges our `undefined`.
-        signal: opts?.signal ?? null,
-        body: JSON.stringify({
-          query: op.document,
-          operationName: op.name,
-          variables: vars ?? {},
-        }),
-      });
+const res = await doFetch(options.url, {
+  method: 'POST',
+  headers,
+  // `RequestInit.signal` is `AbortSignal | null`; `??` bridges our `undefined`.
+  signal: opts?.signal ?? null,
+  body: JSON.stringify({
+    query: op.document,
+    operationName: op.name,
+    variables: vars ?? {},
+  }),
+});
 ```
 
 - [ ] **Step 5: Verify and commit**
@@ -351,15 +359,17 @@ git commit -m "chore(types): enable exactOptionalPropertyTypes"
 
 Under `noUncheckedIndexedAccess`, `src/` has **zero** errors but the type tests have **68**, all from one root cause: `VarProxy` is `{ readonly [K in string]: VarMarker }` — an index signature — so `$.userId` reads as `VarMarker<string> | undefined`, which is not assignable to `Arg<T>`, which collapses `VarsOf` and then `Selected<S>` to `{}`.
 
-This is not an internal problem. **Any consumer whose own tsconfig sets the flag hits it**, and it is currently undocumented. Fixing it properly means either widening `Arg<T>` to accept `undefined` (which would let `{ name: undefined }` satisfy a *required* argument — a real safety loss) or replacing `$.userId` with a callable `$('userId')` (which makes `$` redundant with the existing `v()`). Both are public-API design decisions. This task **documents and tests the limitation** rather than picking one.
+This is not an internal problem. **Any consumer whose own tsconfig sets the flag hits it**, and it is currently undocumented. Fixing it properly means either widening `Arg<T>` to accept `undefined` (which would let `{ name: undefined }` satisfy a _required_ argument — a real safety loss) or replacing `$.userId` with a callable `$('userId')` (which makes `$` redundant with the existing `v()`). Both are public-API design decisions. This task **documents and tests the limitation** rather than picking one.
 
 **Files:**
+
 - Create: `test/types/nuia/tsconfig.json`
 - Create: `test/types/nuia/known-limitation.test-d.ts`
 - Modify: `package.json` (`test:types` script)
 - Modify: `README.md` (the `## Requirements` section, line 255)
 
 **Interfaces:**
+
 - Consumes: Task 2's tsconfig
 - Produces: `npm run test:types` additionally compiles the NUIA fixture, so the day someone fixes `VarProxy` this test fails loudly and tells them to update the docs.
 
@@ -423,7 +433,7 @@ In `package.json`:
 
 In `README.md`, under `## Requirements`, append:
 
-```markdown
+````markdown
 ### Known limitation: `noUncheckedIndexedAccess`
 
 `$.argName` does not type-check in projects that enable TypeScript's
@@ -437,7 +447,9 @@ import { v } from 'buildql';
 
 const q = query('User', ($, Q) => [Q.user({ id: v('id') }, (U) => [U.name])]);
 ```
-```
+````
+
+````
 
 - [ ] **Step 6: Verify and commit**
 
@@ -447,7 +459,7 @@ Expected: PASS
 ```bash
 git add test/types/nuia package.json README.md
 git commit -m "docs(types): pin and document the noUncheckedIndexedAccess limitation"
-```
+````
 
 ---
 
@@ -456,6 +468,7 @@ git commit -m "docs(types): pin and document the noUncheckedIndexedAccess limita
 `Node` collides with DOM `Node` (which is in `lib`), `DirectiveNode` collides with graphql-js's, `On`/`Sel`/`AnySel` are cryptic, `SpreadTarget` and `FragmentDef` are two names for one concept, `varargs.ts` holds a general-purpose utility (`RequiredKeys`) plus variable-call types that belong with the other variable types, and `select.ts:57` re-exports eight types it does not own — creating two import paths for each.
 
 **Files:**
+
 - Create: `src/types/selection.ts` (from `src/types/node.ts`)
 - Delete: `src/types/node.ts`
 - Delete: `src/types/varargs.ts`
@@ -467,6 +480,7 @@ git commit -m "docs(types): pin and document the noUncheckedIndexedAccess limita
 - Modify: `test/types/*.test-d.ts`, `test/unit/*.test.ts` (import paths and type names)
 
 **Interfaces:**
+
 - Consumes: Task 2's tsconfig
 - Produces: `src/types/selection.ts` exporting `VarRef`, `Directive`, `FieldSelection<N, R, V = {}, O extends boolean = false>`, `FragmentDefinition`, `FragmentSpread<R, V = {}>`, `InlineFragment<TN, R, V = {}>`, `AnyFieldSelection`, `SelectionNode`. `src/types/vars.ts` additionally exports `HasVars<V>` and `VarsArg<V>`. `src/types/util.ts` additionally exports `RequiredKeys<V>`. Tasks 5–12 import from these.
 
@@ -548,9 +562,7 @@ export interface InlineFragment<TN extends string, R, V = {}> {
 
 export type AnyFieldSelection = FieldSelection<string, unknown, unknown, boolean>;
 export type SelectionNode =
-  | AnyFieldSelection
-  | FragmentSpread<unknown, unknown>
-  | InlineFragment<string, unknown, unknown>;
+  AnyFieldSelection | FragmentSpread<unknown, unknown> | InlineFragment<string, unknown, unknown>;
 ```
 
 - [ ] **Step 2: Delete the old file**
@@ -607,7 +619,13 @@ export type { AnySel, Node, On, Sel, Spread, KEY, RESULT, VARS };
 Update its own imports on lines 1–2 to the new names:
 
 ```ts
-import type { AnyFieldSelection, FieldSelection, FragmentSpread, InlineFragment, SelectionNode } from './selection.js';
+import type {
+  AnyFieldSelection,
+  FieldSelection,
+  FragmentSpread,
+  InlineFragment,
+  SelectionNode,
+} from './selection.js';
 import type { VARS } from './symbols.js';
 import type { Simplify, UnionToIntersection } from './util.js';
 ```
@@ -622,7 +640,7 @@ Mechanical rename across `src/` and `test/`. The old identifiers are distinctive
 grep -rln "types/node.js\|types/varargs.js\|\bAnySel\b\|\bSpreadTarget\b\|\bDirectiveNode\b" src test
 ```
 
-Apply, per file: `types/node.js` → `types/selection.js`; `types/varargs.js` → `types/vars.js`; `Node` → `SelectionNode`; `Sel` → `FieldSelection`; `AnySel` → `AnyFieldSelection`; `On` → `InlineFragment` (the *type* only — the exported `on()` function keeps its name); `Spread` → `FragmentSpread`; `SpreadTarget` → `FragmentDefinition`; `DirectiveNode` → `Directive`; `.handle` → `.fragment` on spreads.
+Apply, per file: `types/node.js` → `types/selection.js`; `types/varargs.js` → `types/vars.js`; `Node` → `SelectionNode`; `Sel` → `FieldSelection`; `AnySel` → `AnyFieldSelection`; `On` → `InlineFragment` (the _type_ only — the exported `on()` function keeps its name); `Spread` → `FragmentSpread`; `SpreadTarget` → `FragmentDefinition`; `DirectiveNode` → `Directive`; `.handle` → `.fragment` on spreads.
 
 Two sites need more than a rename:
 
@@ -702,6 +720,7 @@ There are two conventions for the same job. `src/runtime/var.ts` brands variable
 Symbols are safe here because these values are printed into the GraphQL document by `printValue` and never cross a JSON boundary. `Symbol.for` (not `Symbol()`) is required: the dual ESM/CJS build means two copies of a module can coexist in one process, exactly as documented on the `WeakMap` in `src/adapters/document.ts`.
 
 **Files:**
+
 - Create: `src/runtime/markers.ts`
 - Modify: `src/runtime/var.ts`
 - Modify: `src/runtime/builders.ts:12-40`
@@ -709,6 +728,7 @@ Symbols are safe here because these values are printed into the GraphQL document
 - Test: `test/unit/print.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 4's `src/types/selection.ts`
 - Produces: `src/runtime/markers.ts` exporting `isVarMarker(x): x is VarMarker`, `makeVarMarker(name: string | null): VarMarker`, `markerName(m: VarMarker): string | null`, `enumValue(v: string): EnumValue`, `isEnumValue(x): x is EnumValue`, `varRefValue(name: string): VarRefValue`, `isVarRefValue(x): x is VarRefValue`.
 
@@ -858,8 +878,8 @@ function markEnums(value: unknown): unknown {
 and inside `splitArgs`, replace the literal assignment:
 
 ```ts
-      varRefs.push({ varName, gqlType });
-      literals[key] = varRefValue(varName);
+varRefs.push({ varName, gqlType });
+literals[key] = varRefValue(varName);
 ```
 
 - [ ] **Step 6: Switch `print.ts` to the symbol predicates**
@@ -922,6 +942,7 @@ git commit -m "refactor(runtime): unify internal markers on symbols, fixing __en
 **Deliberate non-change:** the four `Object.assign(make(undefined), { as })` blocks stay duplicated. Abstracting them behind a generic `withAlias<Base, AsFn>()` helper would add generic indirection to the hottest path in the type checker, and `npm run test:perf` enforces a 25,000-instantiation budget. DRY loses to the measured constraint here.
 
 **Files:**
+
 - Modify: `src/runtime/builders.ts`
 - Modify: `src/index.ts:7`
 - Modify: `src/codegen/emit.ts:12-26, 114-125`
@@ -930,6 +951,7 @@ git commit -m "refactor(runtime): unify internal markers on symbols, fixing __en
 - Modify: `README.md`
 
 **Interfaces:**
+
 - Consumes: Task 5's `markers.ts`
 - Produces: `argSpec<T>(gql, enums?)`, `leafField<N, W, T>(name, wrap)`, `leafFieldArgs<N, W, T, Spec>(name, wrap, spec)`, `objectField<N, W, F>(name, wrap, fields)`, `objectFieldArgs<N, W, F, Spec>(name, wrap, fields, spec)`. The emitter and every generated module use these names.
 
@@ -938,16 +960,16 @@ git commit -m "refactor(runtime): unify internal markers on symbols, fixing __en
 Append inside the existing `describe('emit', ...)` block in `test/unit/emit.test.ts`, reusing its `generated()` helper (defined at the top of that file):
 
 ```ts
-  it('emits the renamed builder family', async () => {
-    const src = await generated();
-    expect(src).toContain('import {\n  argSpec,');
-    expect(src).toContain('leafField<');
-    expect(src).toContain("objectField('");
-    // The old generic names must be gone entirely.
-    expect(src).not.toMatch(/\bobject\(/);
-    expect(src).not.toMatch(/\bleaf</);
-    expect(src).not.toMatch(/\bargs</);
-  });
+it('emits the renamed builder family', async () => {
+  const src = await generated();
+  expect(src).toContain('import {\n  argSpec,');
+  expect(src).toContain('leafField<');
+  expect(src).toContain("objectField('");
+  // The old generic names must be gone entirely.
+  expect(src).not.toMatch(/\bobject\(/);
+  expect(src).not.toMatch(/\bleaf</);
+  expect(src).not.toMatch(/\bargs</);
+});
 ```
 
 Several existing assertions in this file pin the old names (e.g. `"id: leaf<'id', ['!'], string>('id', ['!'])"`) — Step 7's grep catches them.
@@ -983,7 +1005,10 @@ export function leafField<N extends string, const W extends Wrap, T>(
   return Object.assign(base, {
     as<A extends string>(alias: A) {
       // Phantom cast — see the file note above.
-      return makeFieldNode(name, alias, undefined, undefined, []) as unknown as FieldSelection<A, Apply<W, T>>;
+      return makeFieldNode(name, alias, undefined, undefined, []) as unknown as FieldSelection<
+        A,
+        Apply<W, T>
+      >;
     },
   }) as FieldSelection<N, Apply<W, T>> & { as<A extends string>(alias: A): FieldSelection<A, Apply<W, T>> };
 }
@@ -1033,27 +1058,27 @@ function argSpec(field: IRField, ir: IRSchema): string {
 ```
 
 ```ts
-  if (!isComposite) {
-    const ts = leafTsType(field.type, ir);
-    if (field.args.length === 0) {
-      return `  ${field.name}: leafField<'${field.name}', ${wrap}, ${ts}>('${field.name}', ${wrap}),`;
-    }
-    // `leafFieldArgs` cannot infer its result type `T`, and TypeScript has no partial
-    // explicit type arguments — so all four are written out.
-    return `  ${field.name}: leafFieldArgs<'${field.name}', ${wrap}, ${ts}, ${argTsType(field, ir)}>('${field.name}', ${wrap}, ${argSpec(field, ir)}),`;
-  }
-
-  // Getters defer resolution so cyclic type references work.
+if (!isComposite) {
+  const ts = leafTsType(field.type, ir);
   if (field.args.length === 0) {
-    return `  get ${field.name}() { return objectField('${field.name}', ${wrap}, ${field.type.name}) },`;
+    return `  ${field.name}: leafField<'${field.name}', ${wrap}, ${ts}>('${field.name}', ${wrap}),`;
   }
-  return `  get ${field.name}() { return objectFieldArgs('${field.name}', ${wrap}, ${field.type.name}, ${argSpec(field, ir)}) },`;
+  // `leafFieldArgs` cannot infer its result type `T`, and TypeScript has no partial
+  // explicit type arguments — so all four are written out.
+  return `  ${field.name}: leafFieldArgs<'${field.name}', ${wrap}, ${ts}, ${argTsType(field, ir)}>('${field.name}', ${wrap}, ${argSpec(field, ir)}),`;
+}
+
+// Getters defer resolution so cyclic type references work.
+if (field.args.length === 0) {
+  return `  get ${field.name}() { return objectField('${field.name}', ${wrap}, ${field.type.name}) },`;
+}
+return `  get ${field.name}() { return objectFieldArgs('${field.name}', ${wrap}, ${field.type.name}, ${argSpec(field, ir)}) },`;
 ```
 
 and in `emitTypeMap`, the `__typename` line:
 
 ```ts
-  const typename = `  __typename: leafField<'__typename', ['!'], ${typenameTsType(t)}>('__typename', ['!']),`;
+const typename = `  __typename: leafField<'__typename', ['!'], ${typenameTsType(t)}>('__typename', ['!']),`;
 ```
 
 - [ ] **Step 6: Update the type-perf fixture generator**
@@ -1065,8 +1090,8 @@ const lines = [`import { leafField, objectField, makeQuery } from '../../src/ind
 ```
 
 ```js
-    for (let i = 0; i < NF; i++) fs.push(`  f${i}: leafField<'f${i}', ['!'], string>('f${i}', ['!']),`);
-    if (t > 0) fs.push(`  get child() { return objectField('child', ['!'], T${t - 1}); },`);
+for (let i = 0; i < NF; i++) fs.push(`  f${i}: leafField<'f${i}', ['!'], string>('f${i}', ['!']),`);
+if (t > 0) fs.push(`  get child() { return objectField('child', ['!'], T${t - 1}); },`);
 ```
 
 - [ ] **Step 7: Update the remaining call sites**
@@ -1099,6 +1124,7 @@ git commit -m "refactor: rename field builders to argSpec and <kind>Field[Args]"
 `BuildQLHttpError` carries the package prefix and `GraphQLResponseError` does not, and there is no shared supertype — a consumer cannot write one `catch` that distinguishes buildql's failures from anyone else's.
 
 **Files:**
+
 - Modify: `src/client/errors.ts`
 - Modify: `src/client/client.ts`, `src/client/subscribe.ts`, `src/index.ts`
 - Modify: `test/unit/client.test.ts`, `test/unit/subscribe.test.ts`
@@ -1106,6 +1132,7 @@ git commit -m "refactor: rename field builders to argSpec and <kind>Field[Args]"
 - Test: `test/unit/client.test.ts`
 
 **Interfaces:**
+
 - Consumes: nothing from earlier tasks
 - Produces: `abstract class BuildQLError extends Error`; `class BuildQLHttpError extends BuildQLError` (unchanged fields `status`, `body`); `class BuildQLResponseError extends BuildQLError` (renamed from `GraphQLResponseError`; unchanged fields `errors`, `data`). Tasks 8 and 11 throw these.
 
@@ -1210,11 +1237,12 @@ git commit -m "refactor(client): add BuildQLError base and rename GraphQLRespons
 
 ### Task 8: Split the client module
 
-`src/client/client.ts` stutters in its path, defines `createClient`, *and* re-exports eight names that `src/index.ts` re-exports again — two hand-maintained copies of the same list, free to drift. Header merging is open-coded in three places.
+`src/client/client.ts` stutters in its path, defines `createClient`, _and_ re-exports eight names that `src/index.ts` re-exports again — two hand-maintained copies of the same list, free to drift. Header merging is open-coded in three places.
 
-The microtask subtlety documented at `client.ts:106-111` must survive: `subscribe` deliberately does not route through an `async` helper, because `await`-ing one defers a tick even when the value is already resolved, and `wsTransport` opens its socket synchronously in that same turn. The extraction below therefore shares only the *merge* loop; `subscribe` keeps its inline ternary and its comment.
+The microtask subtlety documented at `client.ts:106-111` must survive: `subscribe` deliberately does not route through an `async` helper, because `await`-ing one defers a tick even when the value is already resolved, and `wsTransport` opens its socket synchronously in that same turn. The extraction below therefore shares only the _merge_ loop; `subscribe` keeps its inline ternary and its comment.
 
 **Files:**
+
 - Create: `src/client/headers.ts`
 - Create: `src/client/create-client.ts` (from `src/client/client.ts`)
 - Create: `src/client/index.ts`
@@ -1226,6 +1254,7 @@ The microtask subtlety documented at `client.ts:106-111` must survive: `subscrib
 - Modify: `test/unit/client.test.ts`, `test/unit/subscribe.test.ts`, `test/e2e/generate-and-run.test.ts`, `test/types/client.test-d.ts`
 
 **Interfaces:**
+
 - Consumes: Task 7's error classes
 - Produces: `src/client/headers.ts` exporting `type HeadersSource = HeadersInit | (() => HeadersInit | Promise<HeadersInit>)`, `resolveHeaders(source: HeadersSource | undefined): Promise<HeadersInit>`, and `mergeHeaders(base: HeadersInit, override?: HeadersInit): Headers`. `src/client/index.ts` is the barrel for the `buildql/client` entry point.
 
@@ -1281,23 +1310,22 @@ export interface ClientOptions {
 In `execute`, replace the three header lines with:
 
 ```ts
-      const headers = mergeHeaders(await resolveHeaders(options.headers), opts?.headers);
-      headers.set('content-type', 'application/json');
-      if (!headers.has('accept')) headers.set('accept', 'application/json');
+const headers = mergeHeaders(await resolveHeaders(options.headers), opts?.headers);
+headers.set('content-type', 'application/json');
+if (!headers.has('accept')) headers.set('accept', 'application/json');
 ```
 
 In `subscribe`, keep the inline resolution and its comment, but use `mergeHeaders` for the merge:
 
 ```ts
-          // Deliberately NOT routed through the shared `resolveHeaders` helper: calling
-          // an `async function` always returns a Promise, and `await`-ing it — even when
-          // the value is already resolved — always defers by a microtask. Some transports
-          // (`wsTransport`) construct their connection synchronously as part of this same
-          // turn, so an unconditional `await` here would delay that connection by a tick
-          // for every subscription, not just ones with a headers function to resolve.
-          const base =
-            typeof options.headers === 'function' ? await options.headers() : (options.headers ?? {});
-          const headers = mergeHeaders(base, opts?.headers);
+// Deliberately NOT routed through the shared `resolveHeaders` helper: calling
+// an `async function` always returns a Promise, and `await`-ing it — even when
+// the value is already resolved — always defers by a microtask. Some transports
+// (`wsTransport`) construct their connection synchronously as part of this same
+// turn, so an unconditional `await` here would delay that connection by a tick
+// for every subscription, not just ones with a headers function to resolve.
+const base = typeof options.headers === 'function' ? await options.headers() : (options.headers ?? {});
+const headers = mergeHeaders(base, opts?.headers);
 ```
 
 Note the import of `SubscriptionTransport` now points at `./transport.js`, which Task 9 creates. Until then, keep it pointing at `./subscribe.js` and fix it in Task 9 — or do Task 9 first. **Do Task 9 first if executing out of order.**
@@ -1393,6 +1421,7 @@ git commit -m "refactor(client): split create-client from the barrel, extract he
 `src/client/subscribe.ts` is 205 lines carrying three responsibilities: the transport contract, an SSE implementation, and a WebSocket implementation. Inside it, `wsTransport.subscribe` is a ~95-line function juggling six mutable closure variables (`queue`, `done`, `completed`, `aborted`, `failure`, `wake`) that together are a hand-rolled push-driven async iterator. Four of those are queue mechanics and belong in a testable unit; two (`completed`, `aborted`) are graphql-ws protocol state and stay.
 
 **Files:**
+
 - Create: `src/client/transport.ts`
 - Create: `src/client/async-queue.ts`
 - Create: `src/client/sse-transport.ts`
@@ -1402,6 +1431,7 @@ git commit -m "refactor(client): split create-client from the barrel, extract he
 - Test: `test/unit/async-queue.test.ts` (create), `test/unit/subscribe.test.ts` (repoint imports)
 
 **Interfaces:**
+
 - Consumes: Task 7's errors, Task 8's `headers.ts`
 - Produces: `src/client/transport.ts` exporting `SubscribePayload`, `StreamChunk`, `SubscriptionTransport`. `src/client/async-queue.ts` exporting `class AsyncQueue<T> implements AsyncIterable<T>` with `push(item: T): void`, `fail(error: Error): void`, `close(): void`. `sse-transport.ts` exports `sseTransport` + `SseTransportOptions`; `ws-transport.ts` exports `wsTransport` + `WsTransportOptions`.
 
@@ -1543,7 +1573,11 @@ export interface StreamChunk {
 
 export interface SubscriptionTransport {
   /** `headers` carries per-subscription headers from `client.subscribe(op, vars, { headers })`. */
-  subscribe(payload: SubscribePayload, signal: AbortSignal, headers?: HeadersInit): AsyncIterable<StreamChunk>;
+  subscribe(
+    payload: SubscribePayload,
+    signal: AbortSignal,
+    headers?: HeadersInit,
+  ): AsyncIterable<StreamChunk>;
 }
 ```
 
@@ -1645,8 +1679,7 @@ import type { StreamChunk, SubscriptionTransport } from './transport.js';
 export interface WsTransportOptions {
   readonly url: string;
   readonly connectionParams?:
-    | Record<string, unknown>
-    | (() => Record<string, unknown> | Promise<Record<string, unknown>>);
+    Record<string, unknown> | (() => Record<string, unknown> | Promise<Record<string, unknown>>);
   readonly WebSocket?: typeof WebSocket;
 }
 
@@ -1671,7 +1704,9 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
       socket.onopen = async () => {
         try {
           const params =
-            typeof opts.connectionParams === 'function' ? await opts.connectionParams() : opts.connectionParams;
+            typeof opts.connectionParams === 'function'
+              ? await opts.connectionParams()
+              : opts.connectionParams;
           // The signal may have aborted, or the socket may already have closed, while
           // we were awaiting `connectionParams()` above — sending on a socket that
           // isn't open throws synchronously on a real `WebSocket`. Since nothing awaits
@@ -1766,11 +1801,13 @@ git commit -m "refactor(client): split sse/ws transports, extract AsyncQueue fro
 `toApolloQuery`, `toApolloMutation`, and `toUrqlArgs` each open-code the same two lines of variable defaulting. Both adapters also re-export `TypedDocumentNode` separately.
 
 **Files:**
+
 - Modify: `src/adapters/document.ts`
 - Modify: `src/adapters/apollo.ts`, `src/adapters/urql.ts`
 - Test: `test/unit/adapters.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 4's type names
 - Produces: `src/adapters/document.ts` additionally exports `variablesOf<V>(rest: VarsArg<V>): V`.
 
@@ -1856,12 +1893,14 @@ git commit -m "refactor(adapters): share variable defaulting via variablesOf"
 `src/codegen/emit.ts` mixes two jobs: deciding what TypeScript type a GraphQL type maps to (`scalarTsType`, `leafTsType`, `inputTsType`, `argTsType`, `typenameTsType`, `unmappedScalars`) and assembling source text. The first is reused by field, input, and argument emission and is the part with the subtle rules.
 
 **Files:**
+
 - Create: `src/codegen/ts-types.ts`
 - Modify: `src/codegen/emit.ts`
 - Modify: `src/cli/index.ts:6` (the `unmappedScalars` import)
 - Modify: `test/unit/emit.test.ts` (if it imports `unmappedScalars` directly)
 
 **Interfaces:**
+
 - Consumes: Task 6's builder names
 - Produces: `src/codegen/ts-types.ts` exporting `leafTsType(ref, ir)`, `inputTsType(ref, ir)`, `argTsType(field, ir)`, `typenameTsType(t)`, `unmappedScalars(ir)`. `scalarTsType` stays module-private there.
 
@@ -1893,7 +1932,8 @@ export function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
 
 /** The TypeScript type of an *input* position, wrappers included. */
 export function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
-  const base = ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
+  const base =
+    ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
   let out = base;
   const toks = [...ref.wrap].reverse();
@@ -1996,6 +2036,7 @@ git commit -m "refactor(codegen): split TypeScript type mapping out of the emitt
 `isEntrypoint` exists **only** because `generate`/`main` share a file with the module-scope invocation. Once the invocation lives alone in `bin.ts`, which nothing imports, the guard has no condition left to get wrong and is deleted along with its five tests. Its real guarantee — that the installed binary actually runs — moves to a CI smoke check against the built artifact, which is stronger than a unit test of the predicate.
 
 **Files:**
+
 - Create: `src/cli/reporter.ts`
 - Create: `src/cli/generate.ts`
 - Create: `src/cli/main.ts`
@@ -2007,6 +2048,7 @@ git commit -m "refactor(codegen): split TypeScript type mapping out of the emitt
 - Modify: `test/unit/cli.test.ts`, `test/e2e/generate-and-run.test.ts`
 
 **Interfaces:**
+
 - Consumes: Task 11's `unmappedScalars`
 - Produces: `src/cli/reporter.ts` exporting `interface Reporter { info(message: string): void; warn(message: string): void }`, `consoleReporter: Reporter`, and `collectingReporter(): Reporter & { infos: string[]; warns: string[] }`. `src/cli/generate.ts` exports `generate(config: BuildQLConfig, cwd: string, reporter?: Reporter): Promise<string>`. `src/cli/main.ts` exports `main(argv: string[]): Promise<number>`.
 
@@ -2248,8 +2290,8 @@ import { generate } from '../../src/cli/generate.js';
 This replaces what the deleted `isEntrypoint` tests were protecting, and does it against the real built artifact. Append to the `check` job in `.github/workflows/ci.yml`, after `- run: npm run build`:
 
 ```yaml
-      - name: The built binary actually runs
-        run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
+- name: The built binary actually runs
+  run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
 ```
 
 - [ ] **Step 10: Run the tests to verify they pass**
@@ -2282,6 +2324,7 @@ git commit -m "refactor(cli): split generate/main/bin and inject a reporter port
 Two loose ends remain. `VERSION = '0.1.0'` in `src/index.ts` duplicates `package.json`'s version with nothing keeping them in sync, and `test/unit/smoke.test.ts` asserts the literal `'0.1.0'` — so the next version bump silently makes the export wrong and the test still passes. And nothing catches an accidental addition or removal from the package's public API.
 
 **Files:**
+
 - Modify: `src/index.ts`
 - Delete: `test/unit/smoke.test.ts`
 - Create: `test/unit/public-api.test.ts`
@@ -2289,6 +2332,7 @@ Two loose ends remain. `VERSION = '0.1.0'` in `src/index.ts` duplicates `package
 - Create: `CONTRIBUTING.md`
 
 **Interfaces:**
+
 - Consumes: every prior task's renames
 - Produces: nothing further depends on this.
 
@@ -2304,36 +2348,38 @@ import * as api from '../../src/index.js';
 it('exports exactly the documented public surface', () => {
   // A deliberate tripwire, not a rubber stamp: adding or removing a runtime export is a
   // public API change, so it should require editing this list in the same commit.
-  expect(Object.keys(api).sort()).toEqual([
-    'BuildQLError',
-    'BuildQLHttpError',
-    'BuildQLResponseError',
-    'VERSION',
-    '$',
-    'argSpec',
-    'createClient',
-    'include',
-    'leafField',
-    'leafFieldArgs',
-    'makeFragment',
-    'makeMutation',
-    'makeQuery',
-    'makeSubscription',
-    'objectField',
-    'objectFieldArgs',
-    'on',
-    'skip',
-    'spread',
-    'sseTransport',
-    'v',
-    'wsTransport',
-  ].sort());
+  expect(Object.keys(api).sort()).toEqual(
+    [
+      'BuildQLError',
+      'BuildQLHttpError',
+      'BuildQLResponseError',
+      'VERSION',
+      '$',
+      'argSpec',
+      'createClient',
+      'include',
+      'leafField',
+      'leafFieldArgs',
+      'makeFragment',
+      'makeMutation',
+      'makeQuery',
+      'makeSubscription',
+      'objectField',
+      'objectFieldArgs',
+      'on',
+      'skip',
+      'spread',
+      'sseTransport',
+      'v',
+      'wsTransport',
+    ].sort(),
+  );
 });
 
 it('keeps VERSION in step with package.json', async () => {
-  const pkg = JSON.parse(
-    await readFile(new URL('../../package.json', import.meta.url), 'utf8'),
-  ) as { version: string };
+  const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8')) as {
+    version: string;
+  };
   expect(api.VERSION).toBe(pkg.version);
 });
 ```
@@ -2375,15 +2421,15 @@ A file that grows past ~200 lines or acquires a second reason to change gets spl
 
 **Function prefixes** carry meaning:
 
-| Prefix | Meaning | Example |
-|---|---|---|
-| `make*` | returns a builder function | `makeQuery`, `makeFragment` |
-| `to*` | pure conversion | `toDocument`, `toApolloQuery` |
-| `is*` | type-guard predicate | `isVarMarker`, `isClientKind` |
-| `assert*` | throws, or narrows its argument | `assertKind`, `assertBuildQLConfig` |
-| `collect*` | walks a tree accumulating results | `collectFragments` |
-| `print*` | renders to GraphQL source text | `printOperation`, `printValue` |
-| `emit*` | renders to TypeScript source text | `emitField`, `emitTypeMap` |
+| Prefix     | Meaning                           | Example                             |
+| ---------- | --------------------------------- | ----------------------------------- |
+| `make*`    | returns a builder function        | `makeQuery`, `makeFragment`         |
+| `to*`      | pure conversion                   | `toDocument`, `toApolloQuery`       |
+| `is*`      | type-guard predicate              | `isVarMarker`, `isClientKind`       |
+| `assert*`  | throws, or narrows its argument   | `assertKind`, `assertBuildQLConfig` |
+| `collect*` | walks a tree accumulating results | `collectFragments`                  |
+| `print*`   | renders to GraphQL source text    | `printOperation`, `printValue`      |
+| `emit*`    | renders to TypeScript source text | `emitField`, `emitTypeMap`          |
 
 **Types** are PascalCase and spell out the concept. Avoid abbreviations that only make
 sense from inside the file — `FieldSelection`, not `Sel`.
@@ -2429,12 +2475,14 @@ git commit -m "test: pin the public API surface and document conventions"
 ## Execution Notes
 
 **Task order matters in two places:**
+
 - Task 9 (transport split) creates `src/client/transport.ts`, which Task 8 imports. Run 8 → 9 in order and fix the two import paths as Step 8 of Task 9 says, or run 9 before 8.
 - Task 11 moves `unmappedScalars`, which Task 12's `generate.ts` imports. Run 11 before 12.
 
 Everything else is independent.
 
 **Deliberately not done, with reasons** — so a later reviewer does not "fix" them:
+
 - The four `Object.assign(make(undefined), { as })` blocks in `builders.ts` stay duplicated. Hoisting them behind a generic helper costs type-checker instantiations against a hard 25,000 budget (Task 6).
 - `noUncheckedIndexedAccess` stays off. Enabling it requires either weakening `Arg<T>` to accept `undefined` for required arguments, or replacing `$.name` with `$('name')` — public API decisions, not cleanups (Task 3).
 - `src/types/util.ts` keeps its generic name. Its four members genuinely are general-purpose type utilities, and a longer name would not say more.

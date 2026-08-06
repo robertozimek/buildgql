@@ -44,10 +44,7 @@ type _7 = Expect<
 
 // 8. Sel with no variables does not pollute the result
 type _8 = Expect<
-  Eq<
-    VarsIn<[Sel<'id', string, {}>, Sel<'title', string, { varA: string }>]>,
-    {} & { varA: string }
-  >
+  Eq<VarsIn<[Sel<'id', string, {}>, Sel<'title', string, { varA: string }>]>, {} & { varA: string }>
 >;
 
 // 9. Spread and On both contribute variables

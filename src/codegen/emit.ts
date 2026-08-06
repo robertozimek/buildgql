@@ -72,7 +72,8 @@ function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
 
 /** The TypeScript type of an *input* position, wrappers included. */
 function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
-  const base = ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
+  const base =
+    ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
   let out = base;
   const toks = [...ref.wrap].reverse();
@@ -187,7 +188,8 @@ export function emit(ir: IRSchema, client: ClientKind = 'buildql'): string {
 
   parts.push(`export const query = makeQuery(${ir.queryType});`);
   if (ir.mutationType) parts.push(`export const mutation = makeMutation(${ir.mutationType});`);
-  if (ir.subscriptionType) parts.push(`export const subscription = makeSubscription(${ir.subscriptionType});`);
+  if (ir.subscriptionType)
+    parts.push(`export const subscription = makeSubscription(${ir.subscriptionType});`);
 
   for (const t of composite) {
     parts.push(`export const ${lowerFirst(t.name)}Fragment = makeFragment('${t.name}', ${t.name});`);

@@ -15,7 +15,11 @@ function isVarRefMarker(x: unknown): x is VarRefMarker {
 function printValue(value: unknown): string {
   if (isVarRefMarker(value)) return `$${value.__varRef}`;
   if (value === null || value === undefined) return 'null';
-  if (typeof value === 'object' && value !== null && typeof (value as { __enum?: unknown }).__enum === 'string') {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { __enum?: unknown }).__enum === 'string'
+  ) {
     return (value as { __enum: string }).__enum;
   }
   if (typeof value === 'string') return JSON.stringify(value);

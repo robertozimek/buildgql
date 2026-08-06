@@ -76,12 +76,9 @@ describe('loadConfig', () => {
     await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars"/);
   });
 
-  it('surfaces the config module\'s own error instead of TypeScript-support advice', async () => {
+  it("surfaces the config module's own error instead of TypeScript-support advice", async () => {
     const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(
-      join(dir, 'buildql.config.mjs'),
-      "throw new Error('boom: DATABASE_URL is not set');\n",
-    );
+    await writeFile(join(dir, 'buildql.config.mjs'), "throw new Error('boom: DATABASE_URL is not set');\n");
     await expect(loadConfig(dir)).rejects.toThrow(/boom: DATABASE_URL is not set/);
     await expect(loadConfig(dir)).rejects.not.toThrow(/Node must be able to run TypeScript directly/);
   });
@@ -136,10 +133,7 @@ describe('loadConfig', () => {
     );
 
     await expect(
-      loadConfig(
-        dir,
-        importModuleThrowingFor(tsPath, new SyntaxError("Unexpected token ')'")),
-      ),
+      loadConfig(dir, importModuleThrowingFor(tsPath, new SyntaxError("Unexpected token ')'"))),
     ).rejects.toThrow(/Unexpected token/);
   });
 
@@ -149,7 +143,9 @@ describe('loadConfig', () => {
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
     await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
 
-    const err = Object.assign(new Error('Unknown file extension ".ts"'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+    const err = Object.assign(new Error('Unknown file extension ".ts"'), {
+      code: 'ERR_UNKNOWN_FILE_EXTENSION',
+    });
     const { config, path } = await loadConfig(dir, importModuleThrowingFor(tsPath, err));
 
     expect(config.schema).toBe('./schema.graphql');
@@ -162,7 +158,9 @@ describe('loadConfig', () => {
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
     await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
 
-    const err = Object.assign(new Error('Unknown file extension ".ts"'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+    const err = Object.assign(new Error('Unknown file extension ".ts"'), {
+      code: 'ERR_UNKNOWN_FILE_EXTENSION',
+    });
     // `vi.spyOn(process.stderr, 'write')` does not reliably observe writes made through
     // `process.stderr.write` inside this codebase's own modules under Vitest's runner
     // (the stream's `write` is not a plain own property), so intercept with a direct
@@ -189,7 +187,9 @@ describe('loadConfig', () => {
     const tsPath = join(dir, 'buildql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
 
-    const err = Object.assign(new Error('Unknown file extension ".ts"'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+    const err = Object.assign(new Error('Unknown file extension ".ts"'), {
+      code: 'ERR_UNKNOWN_FILE_EXTENSION',
+    });
     await expect(loadConfig(dir, importModuleThrowingFor(tsPath, err))).rejects.toThrow(
       /Node must be able to run TypeScript directly/,
     );
@@ -199,7 +199,10 @@ describe('loadConfig', () => {
     const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
     const tsPath = join(dir, 'buildql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
-    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './should-not-be-used.graphql' };\n");
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      "export default { schema: './should-not-be-used.graphql' };\n",
+    );
 
     await expect(
       loadConfig(dir, importModuleThrowingFor(tsPath, new Error('boom: DATABASE_URL is not set'))),

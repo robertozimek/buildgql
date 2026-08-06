@@ -35,7 +35,10 @@ declare function build<S extends readonly Node[]>(
 // 1. wrappers survive: [Post!]! is Post[], nullable leaf is string | null
 const a = build((R) => [R.posts((P) => [P.id, P.title, P.author((A) => [A.id, A.lastName])])]);
 type _1 = Expect<
-  Eq<(typeof a)['r'], { posts: { id: string; title: string; author: { id: string; lastName: string | null } }[] }>
+  Eq<
+    (typeof a)['r'],
+    { posts: { id: string; title: string; author: { id: string; lastName: string | null } }[] }
+  >
 >;
 
 // 2. variables are captured from argument position and named after the arg key

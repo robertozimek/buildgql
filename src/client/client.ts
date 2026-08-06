@@ -7,7 +7,12 @@ import type { SubscriptionTransport } from './subscribe.js';
 export { sseTransport, wsTransport } from './subscribe.js';
 export { BuildQLHttpError, GraphQLResponseError } from './errors.js';
 export type { GraphQLFormattedError } from './errors.js';
-export type { SseTransportOptions, StreamChunk, SubscriptionTransport, WsTransportOptions } from './subscribe.js';
+export type {
+  SseTransportOptions,
+  StreamChunk,
+  SubscriptionTransport,
+  WsTransportOptions,
+} from './subscribe.js';
 
 export interface ClientOptions {
   readonly url: string;
@@ -21,7 +26,10 @@ export interface ExecuteOptions {
   readonly headers?: HeadersInit;
 }
 
-type VarArgs<V> = HasVars<V> extends true ? [vars: NoInfer<V>, opts?: ExecuteOptions] : [vars?: NoInfer<V>, opts?: ExecuteOptions];
+type VarArgs<V> =
+  HasVars<V> extends true
+    ? [vars: NoInfer<V>, opts?: ExecuteOptions]
+    : [vars?: NoInfer<V>, opts?: ExecuteOptions];
 
 interface RawResponse {
   data?: unknown;
