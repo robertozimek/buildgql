@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
+import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
 import { $, v } from '../../src/runtime/var.js';
 import { printOperation } from '../../src/runtime/print.js';
+import { makeQuery } from '../../src/runtime/operation.js';
 
 const User = {
   id: leaf<'id', ['!'], string>('id', ['!']),
@@ -101,5 +102,31 @@ describe('printOperation', () => {
     };
     const doc = printOperation('query', 'Q', [F.f({ status: 'ACTIVE', name: 'Ada' }, (U) => [U.id])]);
     expect(doc).toBe('query Q { f(status: ACTIVE, name: "Ada") { id } }');
+  });
+
+  it('does not mistake a user input object with a __enum key for an enum value', () => {
+    const Root = {
+      search: leafArgs<'search', ['!'], string, { filter: { __enum: string } }>(
+        'search',
+        ['!'],
+        args<{ filter: { __enum: string } }>({ filter: 'FilterInput!' }),
+      ),
+    };
+    const q = makeQuery(Root)('Search', (_$, R) => [R.search({ filter: { __enum: 'NOT_AN_ENUM' } })]);
+    expect(q.document).toContain('{__enum: "NOT_AN_ENUM"}');
+    expect(q.document).not.toContain('filter: NOT_AN_ENUM');
+  });
+
+  it('does not mistake a user input object with a __varRef key for a variable', () => {
+    const Root = {
+      search: leafArgs<'search', ['!'], string, { filter: { __varRef: string } }>(
+        'search',
+        ['!'],
+        args<{ filter: { __varRef: string } }>({ filter: 'FilterInput!' }),
+      ),
+    };
+    const q = makeQuery(Root)('Search', (_$, R) => [R.search({ filter: { __varRef: 'nope' } })]);
+    expect(q.document).toContain('{__varRef: "nope"}');
+    expect(q.document).not.toContain('$nope');
   });
 });

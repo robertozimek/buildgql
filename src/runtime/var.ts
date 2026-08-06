@@ -1,20 +1,7 @@
 import type { VarMarker, VarProxy } from '../types/vars.js';
+import { makeVarMarker } from './markers.js';
 
-const VAR = Symbol.for('buildql.var');
-
-interface RuntimeMarker {
-  readonly [VAR]: true;
-  /** `null` means "take the name from the argument key". */
-  readonly __var: string | null;
-}
-
-export function isVarMarker(x: unknown): x is VarMarker {
-  return typeof x === 'object' && x !== null && (x as Record<symbol, unknown>)[VAR] === true;
-}
-
-function makeMarker(name: string | null): RuntimeMarker {
-  return { [VAR]: true, __var: name };
-}
+export { isVarMarker, markerName } from './markers.js';
 
 /**
  * Placeholder proxy. The accessed key is deliberately ignored: a mapped type
@@ -24,18 +11,11 @@ function makeMarker(name: string | null): RuntimeMarker {
  */
 export const $: VarProxy = new Proxy({} as VarProxy, {
   get() {
-    return makeMarker(null);
+    return makeVarMarker(null);
   },
 });
 
 /** Explicitly name a variable — use when two fields would collide on an arg key. */
 export function v<N extends string>(name: N): VarMarker<N> {
-  return makeMarker(name) as unknown as VarMarker<N>;
+  return makeVarMarker(name) as VarMarker<N>;
 }
-
-/** The explicit name, or `null` when the marker came from `$`. */
-export function markerName(m: VarMarker): string | null {
-  return (m as unknown as RuntimeMarker).__var;
-}
-
-export { VAR };
