@@ -17,4 +17,9 @@ jobs:
         name: Lint, format, types, tests, type-perf budget
       - run: npm run build
       - name: The built binary actually runs
+        # Explicit `shell: bash` (rather than the platform default) so GitHub Actions runs
+        # this as `bash --noprofile --norc -eo pipefail {0}`. Without it, the unqualified
+        # default on Linux is `bash -e {0}` — no pipefail — so the pipe's exit status is
+        # grep's alone and a nonzero `node` exit is silently discarded.
+        shell: bash
         run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
