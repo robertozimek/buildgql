@@ -43,6 +43,17 @@ const optionalOnlyQuery = makeQuery({
 })('Echo', ($, Q) => [Q.echo({ note: $.note })]);
 const optionalClient = createClient({ url: 'http://localhost/graphql' });
 
+// The `() => HeadersInit | Promise<HeadersInit>` arm of `HeadersSource` — the lazy
+// auth-token form, which no other type test covers. Its whole point is that the
+// supplier is re-invoked per request, so it must type-check as an async function.
+const lazyHeaderClient = createClient({
+  url: 'http://localhost/graphql',
+  headers: async () => ({ a: 'b' }),
+});
+// ...but only when it actually produces headers.
+// @ts-expect-error a headers function must resolve to HeadersInit, not an arbitrary value
+createClient({ url: 'http://localhost/graphql', headers: async () => 42 });
+
 async function main() {
   const r = await client.execute(m, { name: 'John Smith', email: 'john@smith.com' });
   const id: string = r.createUser.id;

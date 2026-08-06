@@ -176,6 +176,12 @@ it('drives the graphql-ws handshake: connection_init -> ack -> subscribe -> next
   const iterator = client.subscribe(s)[Symbol.asyncIterator]();
   const first = iterator.next();
 
+  // subscribe must not await when headers are static — wsTransport opens its socket in this
+  // same turn (see create-client.ts:107-108). Named here so that reverting that ternary to an
+  // unconditional `await` reports the invariant it broke, not a bare `undefined` TypeError on
+  // the next line.
+  expect(FakeWebSocket.instances).toHaveLength(1);
+
   const socket = FakeWebSocket.instances[0];
   expect(socket.protocol).toBe('graphql-transport-ws');
 
@@ -321,6 +327,33 @@ it('threads per-subscription headers to the transport, merged with (and overridi
   expect(seenHeaders[0]?.get('x-sub-only')).toBe('sub');
   // Per-subscription headers win over client-level ones for the same key.
   expect(seenHeaders[0]?.get('x-both')).toBe('sub');
+});
+
+it('resolves a function-form `headers` option before handing them to the transport', async () => {
+  // The lazy-token arm of `HeadersSource` on the SUBSCRIBE path. `execute` resolves headers
+  // through `resolveHeaders`, but `subscribe` inlines its own ternary (to avoid an
+  // unconditional microtask — see create-client.ts:100-108), so the function form has to be
+  // pinned separately here or that whole arm could be deleted with the suite still green.
+  const seenHeaders: Headers[] = [];
+  const transport: SubscriptionTransport = {
+    async *subscribe(_payload, _signal, headers) {
+      seenHeaders.push(new Headers(headers ?? {}));
+    },
+  };
+  const client = createClient({
+    url: 'http://x/graphql',
+    headers: async () => ({ authorization: 'Bearer t' }),
+    subscriptions: transport,
+  });
+
+  for await (const _chunk of client.subscribe(s, undefined, { headers: { 'x-sub-only': 'sub' } })) {
+    /* nothing yielded by this transport */
+  }
+
+  expect(seenHeaders).toHaveLength(1);
+  expect(seenHeaders[0]?.get('authorization')).toBe('Bearer t');
+  // The awaited value still goes through the same merge as the static form.
+  expect(seenHeaders[0]?.get('x-sub-only')).toBe('sub');
 });
 
 it('throws BuildQLHttpError (not a bare Error) when the SSE handshake fails with a non-2xx status', async () => {

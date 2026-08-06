@@ -123,6 +123,58 @@ describe('emit', () => {
     expect(src).toContain("argSpec<{ status: Status }>({ status: 'Status!' }, ['status'])");
   });
 
+  it('emits leafFieldArgs for a scalar field that takes arguments', () => {
+    // Built by hand because no fixture schema has one: every args-bearing field in
+    // `test/fixtures/schema.graphql` and the e2e server is composite, so the
+    // `leafFieldArgs` branch of `emitField` would otherwise never execute — a typo
+    // confined to that one template literal would keep the whole suite green while
+    // every consumer with an everyday `avatar(size: Int): String` field got a module
+    // importing a name it never calls.
+    const schema: IRSchema = {
+      queryType: 'Query',
+      mutationType: null,
+      subscriptionType: null,
+      scalars: DEFAULT_SCALARS,
+      types: [
+        {
+          name: 'Query',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'avatar',
+              type: { wrap: [], name: 'String', kind: 'scalar' },
+              gqlType: 'String',
+              description: null,
+              deprecated: null,
+              args: [
+                {
+                  name: 'size',
+                  type: { wrap: ['!'], name: 'Int', kind: 'scalar' },
+                  gqlType: 'Int!',
+                  optional: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const src = emit(schema);
+    // Pinned as one whole line: the builder name, both occurrences of the field name,
+    // both wrapper tuples, the result type, the argument object type and the arg spec
+    // all come from the same template literal, so any typo inside it fails here.
+    expect(src).toContain(
+      "  avatar: leafFieldArgs<'avatar', [], string, { size: number }>('avatar', [], argSpec<{ size: number }>({ size: 'Int!' })),",
+    );
+    // It must be the leaf-with-args builder, never the composite one.
+    expect(src).not.toContain("objectFieldArgs('avatar'");
+  });
+
   it('falls back to `unknown` for an unmapped scalar named "valueOf", rather than splicing in the inherited Object.prototype member', () => {
     // Regression test for leafTsType/inputTsType: `ir.scalars` here is a plain object
     // (`DEFAULT_SCALARS` inherits from `Object.prototype`), so a bracket read of
@@ -246,10 +298,16 @@ describe('emit', () => {
     expect(src).toContain('import {\n  argSpec,');
     expect(src).toContain('leafField<');
     expect(src).toContain("objectField('");
-    // The old generic names must be gone entirely.
+    // All five old generic names must be gone. The three patterns below each anchor on
+    // the punctuation that used to follow the name, so they say nothing about `leafArgs`
+    // and `objectArgs` — and `\b` does not match between `f` and `A`, so a revert of
+    // those two to their old names slips past all three untouched. They get their own
+    // assertion, with a closing `\b` so the current `leafFieldArgs` / `objectFieldArgs`
+    // do not trip it.
     expect(src).not.toMatch(/\bobject\(/);
     expect(src).not.toMatch(/\bleaf</);
     expect(src).not.toMatch(/\bargs</);
+    expect(src).not.toMatch(/\bleafArgs\b|\bobjectArgs\b/);
   });
 });
 
