@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { leafField, objectField } from '../../src/runtime/builders.js';
 import { makeQuery } from '../../src/runtime/operation.js';
-import { createClient } from '../../src/client/client.js';
+import { createClient } from '../../src/client/index.js';
 import { BuildQLError, BuildQLHttpError, BuildQLResponseError } from '../../src/client/errors.js';
 
 const User = { id: leafField<'id', ['!'], string>('id', ['!']) };
