@@ -45,9 +45,13 @@ duplicated rather than being hoisted behind a helper.
 `src/adapters/**` and `src/codegen/**`. `src/index.ts`, `src/client/**`, `src/runtime/**`
 and `src/types/**` must work for consumers who never install it.
 
-**Public surface.** `src/index.ts`'s runtime exports are pinned by
-`test/unit/public-api.test.ts` — adding or removing one means updating that list in the
-same commit. Built-output invariants (what `bin`/`exports`/`typesVersions` resolve to,
-cross-entry error identity, the CLI shebang) live in `test/built/interop.test.ts`
-instead, since those depend on `tsup.config.ts` and `package.json` rather than on
-`src/`.
+**Public surface.** `src/index.ts`'s runtime (value) exports are pinned by
+`test/unit/public-api.test.ts`; its full export surface, values and type-only alike, is
+separately pinned by `test/built/type-surface.test.ts` against the built
+`dist/index.d.ts` — a type-only export has no runtime binding, so the first list can't
+see it either added or removed. Adding or removing any export from `src/index.ts` means
+updating whichever list(s) actually see it in the same commit. Built-output invariants
+that aren't about the export surface itself (what `bin`/`exports`/`typesVersions`
+resolve to, cross-entry error identity, the CLI shebang) live in
+`test/built/interop.test.ts` instead, since those depend on `tsup.config.ts` and
+`package.json` rather than on `src/`.
