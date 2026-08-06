@@ -16,3 +16,5 @@ jobs:
       - run: npm run check
         name: Lint, format, types, tests, type-perf budget
       - run: npm run build
+      - name: The built binary actually runs
+        run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'

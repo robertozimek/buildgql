@@ -15,9 +15,12 @@
     "type": "git",
     "url": "git+https://github.com/rozimek/buildql.git"
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/cli/bin.js",
+    "./dist/cli/bin.cjs"
+  ],
   "bin": {
-    "buildql": "./dist/cli/index.js"
+    "buildql": "./dist/cli/bin.js"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
