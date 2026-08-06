@@ -1,7 +1,9 @@
 # Contributing
 
 Run `npm run check` before every commit. It runs, in order: ESLint, Prettier,
-`tsc`, Vitest, and the type-instantiation budget.
+`tsc`, the build, Vitest, and the type-instantiation budget. The build sits between
+`tsc` and Vitest — not merely alongside them — because `test/built/**` asserts on
+`dist/` output rather than on `src/`, and needs it to exist first.
 
 ## Conventions
 
