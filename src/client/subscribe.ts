@@ -1,4 +1,4 @@
-import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
+import { BuildQLHttpError, BuildQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 
 export interface SubscribePayload {
@@ -158,7 +158,7 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
           // — surface it via the same error type the `next`-with-`errors` path uses,
           // instead of discarding the server's diagnostics.
           const errors: readonly GraphQLFormattedError[] = Array.isArray(msg.payload) ? msg.payload : [];
-          failure = new GraphQLResponseError(errors, undefined);
+          failure = new BuildQLResponseError(errors, undefined);
           done = true;
           notify();
         } else if (msg.type === 'complete') {

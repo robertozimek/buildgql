@@ -1,11 +1,11 @@
 import type { Operation } from '../runtime/operation.js';
 import type { HasVars } from '../types/vars.js';
-import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
+import { BuildQLHttpError, BuildQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 import type { SubscriptionTransport } from './subscribe.js';
 
 export { sseTransport, wsTransport } from './subscribe.js';
-export { BuildQLHttpError, GraphQLResponseError } from './errors.js';
+export { BuildQLError, BuildQLHttpError, BuildQLResponseError } from './errors.js';
 export type { GraphQLFormattedError } from './errors.js';
 export type {
   SseTransportOptions,
@@ -89,7 +89,7 @@ export function createClient(options: ClientOptions): Client {
       }
 
       if (payload.errors && payload.errors.length > 0) {
-        throw new GraphQLResponseError(payload.errors, payload.data);
+        throw new BuildQLResponseError(payload.errors, payload.data);
       }
       return payload.data as R;
     },
@@ -124,7 +124,7 @@ export function createClient(options: ClientOptions): Client {
           for (const [k, val] of new Headers(opts?.headers ?? {})) headers.set(k, val);
           for await (const chunk of transport.subscribe(payload, controller.signal, headers)) {
             if (chunk.errors && chunk.errors.length > 0) {
-              throw new GraphQLResponseError(chunk.errors, chunk.data);
+              throw new BuildQLResponseError(chunk.errors, chunk.data);
             }
             yield chunk.data as R;
           }
