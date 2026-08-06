@@ -32,8 +32,8 @@ export default defineConfig([
   },
   {
     ...shared,
-    // `src/cli/config.ts`, `src/cli/generate.ts` and `src/cli/bin.ts` are held OUT of the
-    // splitting config above, and must stay out.
+    // `src/cli/config.ts` and `src/cli/bin.ts` are held OUT of the splitting config above,
+    // and must stay out.
     //
     // tsup implements CJS splitting by having esbuild emit ESM and then running the
     // result through sucrase with `transforms: ['imports']` (the `cjsSplitting` plugin,
@@ -49,15 +49,27 @@ export default defineConfig([
     // anyway: config.ts imports only node builtins and ../codegen/clients.js, and never
     // touches src/client/errors.ts, so it shares no chunk with anything.
     //
-    // `generate.ts` and `bin.ts` join it here rather than the splitting config above for
-    // the same reason: `bin.ts` imports `main.ts`, which imports `config.ts`, so
-    // `loadConfig`'s dynamic `import()` would be pulled into their bundles too — and
-    // `generate.ts` itself transitively reaches `codegen/introspect.ts`'s
-    // `await import('graphql')`, a second dynamic import in the same dependency graph.
+    // `bin.ts` joins it here rather than the splitting config above for the same reason:
+    // `bin.ts` imports `main.ts`, which imports `config.ts`, so `loadConfig`'s dynamic
+    // `import()` would be pulled into `bin.ts`'s own bundle too, and `main.ts` also imports
+    // `generate.ts`, which transitively reaches `codegen/introspect.ts`'s
+    // `await import('graphql')` — a second dynamic import in the same dependency graph.
     // Neither entry shares a chunk with `src/index.ts` or `src/client/index.ts` (the CLI
     // never imports `client/errors.ts`), so splitting buys this group nothing either —
     // keeping it out of the splitting config costs nothing and avoids the sucrase rewrite
     // for both dynamic imports at once.
+    //
+    // `src/cli/generate.ts` is NOT listed as its own entry here, deliberately: it has no
+    // `exports` subpath (only `main.ts` and the CLI's own tests import it, both straight
+    // from `src/`, not from `dist/`), so building it as a standalone `dist/cli/generate.*`
+    // would ship a file `package.json`'s `exports` map makes unreachable —
+    // `require('buildql/generate')`/`import 'buildql/generate'` both fail with
+    // `ERR_PACKAGE_PATH_NOT_EXPORTED` no matter what's on disk. `generate.ts`'s code still
+    // ships: esbuild inlines its whole graph into `bin.js`/`bin.cjs` as a duplicate copy
+    // (not a shared chunk, since `splitting` is off here), which is how `buildql generate`
+    // keeps working. If a real consumer ever needs to embed the pipeline directly (the
+    // reason `reporter.ts` exists as a port in the first place), add `./generate` to
+    // `exports` and `typesVersions` and reinstate this entry — until then it stays internal.
     //
     // `splitting: false` is spelled out rather than left to the default (which is already
     // false for cjs) because it is load-bearing here, not incidental — this config exists
@@ -66,13 +78,12 @@ export default defineConfig([
     //
     // Spelled as an entry MAP, not an array. tsup derives each output path by stripping
     // the common base directory of its own entry list, so an array of `src/cli/*` paths
-    // would have base `src/cli` and land each file at `dist/config.js`, `dist/generate.js`,
-    // `dist/bin.js` — colliding with the first config's root bundle, which these configs
-    // then write in parallel. The build still reports success; `bin` just points at a file
-    // that no longer exists.
+    // would have base `src/cli` and land each file at `dist/config.js`, `dist/bin.js` —
+    // colliding with the first config's root bundle, which these configs then write in
+    // parallel. The build still reports success; `bin` just points at a file that no
+    // longer exists.
     entry: {
       'cli/config': 'src/cli/config.ts',
-      'cli/generate': 'src/cli/generate.ts',
       'cli/bin': 'src/cli/bin.ts',
     },
     format: ['esm', 'cjs'],
