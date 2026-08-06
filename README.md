@@ -265,7 +265,7 @@ Use the explicit form instead — it is unaffected:
 ```ts
 import { v } from 'buildql';
 
-const q = query('User', ($, Q) => [Q.user({ id: v('id') }, (U) => [U.name])]);
+const UserById = query('UserById', ($, q) => [q.user({ id: v('id') }, (user) => [user.name])]);
 ```
 
 ## License
