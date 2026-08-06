@@ -300,11 +300,15 @@ describe('emit', () => {
     expect(src).toContain('leafField<');
     expect(src).toContain("objectField('");
     // All five old generic names must be gone. The three patterns below each anchor on
-    // the punctuation that used to follow the name, so they say nothing about `leafArgs`
-    // and `objectArgs` — and `\b` does not match between `f` and `A`, so a revert of
-    // those two to their old names slips past all three untouched. They get their own
-    // assertion, with a closing `\b` so the current `leafFieldArgs` / `objectFieldArgs`
-    // do not trip it.
+    // the punctuation that used to follow the name, so none of them says anything about
+    // `leafArgs` / `objectArgs` — and `\b` does not match between `f` and `A`, so a revert
+    // of those two to their old names slips past all three untouched. They get their own
+    // assertion below.
+    //
+    // That assertion's closing `\b` is NOT what spares the current `leafFieldArgs` /
+    // `objectFieldArgs`: those do not contain `leafArgs`/`objectArgs` as substrings at
+    // all, so they could never match either way. Its only real effect is to exclude a
+    // hypothetical future suffixed name such as `leafArgsSpec`.
     expect(src).not.toMatch(/\bobject\(/);
     expect(src).not.toMatch(/\bleaf</);
     expect(src).not.toMatch(/\bargs</);
