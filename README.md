@@ -170,10 +170,11 @@ export default defineConfig({
 **Apollo Client:**
 
 ```ts
-import { query, $, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
+import { query, mutation, $, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
 import { useQuery } from '@apollo/client';
 
 const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
+const CreateUser = mutation('CreateUser', ($, M) => [M.createUser({ name: $.name }, (U) => [U.id])]);
 
 // Imperative API — the adapter returns Apollo's options object verbatim.
 const { data } = await apolloClient.query(toApolloQuery(UserById, { id: '7' }));
@@ -182,7 +183,7 @@ const { data } = await apolloClient.query(toApolloQuery(UserById, { id: '7' }));
 await apolloClient.mutate(toApolloMutation(CreateUser, { name: 'Ada' }));
 
 // Hooks take the document positionally, so pass `apolloDocument(...)`.
-const { data } = useQuery(apolloDocument(UserById), { variables: { id: '7' } });
+const { data: hookData } = useQuery(apolloDocument(UserById), { variables: { id: '7' } });
 ```
 
 `toApolloQuery` also covers `client.watchQuery()` and `client.subscribe()`, which
@@ -192,20 +193,25 @@ take the same `{ query, variables }` shape. Passing a mutation to `toApolloQuery
 **urql:**
 
 ```ts
-import { query, $, toUrqlArgs, urqlDocument } from './src/gql';
+import { query, mutation, $, toUrqlArgs, urqlDocument } from './src/gql';
 import { useQuery, useMutation } from 'urql';
+
+const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
+const CreateUser = mutation('CreateUser', ($, M) => [M.createUser({ name: $.name }, (U) => [U.id])]);
 
 // urql uses `{ query, variables }` for queries, mutations and subscriptions alike.
 const [result] = useQuery(toUrqlArgs(UserById, { id: '7' }));
 //     ^? { data?: { user: { id: string; firstName: string } } }
 
 const [, createUser] = useMutation(urqlDocument(CreateUser));
-await urqlClient.query(urqlDocument(UserById), { id: '7' });
+await urqlClient.query(urqlDocument(UserById), { id: '7' }).toPromise();
 ```
 
-Both adapters return a `TypedDocumentNode<Result, Variables>` — the same phantom-typed
-node Apollo and urql already understand — so `data` and `variables` are typed
-end-to-end with no extra generics at the call site.
+Every adapter is built on a `TypedDocumentNode<Result, Variables>` — the same phantom-typed
+node Apollo and urql already understand. `apolloDocument`/`urqlDocument` return one directly;
+`toApolloQuery`/`toApolloMutation`/`toUrqlArgs` return a `{ query, variables }` (or
+`{ mutation, variables }`) object whose document field is one — so `data` and `variables` are
+typed end-to-end with no extra generics at the call site.
 
 Variables follow the same rule as `client.execute`: required schema arguments make the
 `vars` argument mandatory, all-optional ones make it omissible.
