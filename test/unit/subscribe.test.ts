@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { leafField, objectField } from '../../src/runtime/builders.js';
 import { makeSubscription } from '../../src/runtime/operation.js';
-import { createClient } from '../../src/client/client.js';
+import { createClient } from '../../src/client/index.js';
 import { sseTransport, wsTransport } from '../../src/client/subscribe.js';
 import type { SubscriptionTransport } from '../../src/client/subscribe.js';
 import { BuildQLHttpError } from '../../src/client/errors.js';

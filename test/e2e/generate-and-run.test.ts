@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { generate } from '../../src/cli/index.js';
-import { createClient } from '../../src/client/client.js';
+import { createClient } from '../../src/client/index.js';
 import type { Operation } from '../../src/index.js';
 import { startServer } from './fixtures/server.js';
 

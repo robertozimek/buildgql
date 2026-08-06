@@ -1,14 +1,23 @@
-export { createClient } from './client/client.js';
-export type { Client, ClientOptions, ExecuteOptions } from './client/client.js';
-export { BuildQLError, BuildQLHttpError, BuildQLResponseError } from './client/errors.js';
-export type { GraphQLFormattedError } from './client/errors.js';
-export { sseTransport, wsTransport } from './client/subscribe.js';
+export {
+  BuildQLError,
+  BuildQLHttpError,
+  BuildQLResponseError,
+  createClient,
+  sseTransport,
+  wsTransport,
+} from './client/index.js';
 export type {
+  Client,
+  ClientOptions,
+  ExecuteOptions,
+  GraphQLFormattedError,
+  HeadersSource,
   SseTransportOptions,
   StreamChunk,
+  SubscribePayload,
   SubscriptionTransport,
   WsTransportOptions,
-} from './client/subscribe.js';
+} from './client/index.js';
 export { argSpec, leafField, leafFieldArgs, objectField, objectFieldArgs } from './runtime/builders.js';
 export { include, skip } from './runtime/directives.js';
 export { makeFragment, spread } from './runtime/fragment.js';

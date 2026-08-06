@@ -6,7 +6,7 @@ import {
   objectFieldArgs,
 } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
-import { createClient } from '../../src/client/client.js';
+import { createClient } from '../../src/client/index.js';
 
 const User = {
   id: leafField<'id', ['!'], string>('id', ['!']),
