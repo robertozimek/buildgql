@@ -76,6 +76,30 @@ it('parses CRLF-framed SSE events (real servers emit \\r\\n line endings)', asyn
   expect(seen).toEqual(['1', '2']);
 });
 
+it('resolves function-form sseTransport headers and lets per-subscription headers win', async () => {
+  const fetchMock = vi.fn<typeof fetch>(async () => sseResponse(['event: complete\ndata: \n\n']));
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: sseTransport({
+      url: 'http://x/graphql',
+      headers: async () => ({ authorization: 'Bearer t', 'x-both': 'transport' }),
+      fetch: fetchMock,
+    }),
+  });
+
+  for await (const _chunk of client.subscribe(s, undefined, { headers: { 'x-both': 'sub' } })) {
+    /* nothing yielded before `complete` */
+  }
+
+  const init = fetchMock.mock.calls[0]![1] as RequestInit;
+  const headers = new Headers(init.headers);
+  expect(headers.get('authorization')).toBe('Bearer t');
+  // Per-subscription headers win over transport-level ones for the same key.
+  expect(headers.get('x-both')).toBe('sub');
+  expect(headers.get('content-type')).toBe('application/json');
+  expect(headers.get('accept')).toBe('text/event-stream');
+});
+
 it('throws instead of completing silently when an SSE stream ends mid-event', async () => {
   const fetchMock = vi.fn<typeof fetch>(async () =>
     // No terminating `\n\n` and no `complete` event: the connection was dropped
@@ -258,6 +282,32 @@ it('throws when the WS socket closes without a complete message (abnormal close)
   const second = iterator.next();
   socket.onclose?.call(socket, new CloseEvent('close', { code: 1006, wasClean: false }));
   await expect(second).rejects.toThrow('buildql: subscription stream ended before completing');
+});
+
+it('keeps the first WS failure when an abnormal close follows a socket error', async () => {
+  FakeWebSocket.instances.length = 0;
+
+  const client = createClient({
+    url: 'http://x/graphql',
+    subscriptions: wsTransport({ url: 'ws://x/graphql', WebSocket: FakeWebSocket }),
+  });
+
+  const iterator = client.subscribe(s)[Symbol.asyncIterator]();
+  const first = iterator.next();
+
+  const socket = FakeWebSocket.instances[0];
+  await socket.onopen?.call(socket, new Event('open'));
+  socket.emitMessage({ type: 'connection_ack' });
+
+  // `onerror` records the FIRST failure via `AsyncQueue.fail`. The `onclose` that a real
+  // socket fires right after `onerror` must not overwrite it — `AsyncQueue.fail` ignores a
+  // second call, so this pins that guard at the level where the deleted `!failure` check in
+  // the old inline `onclose` actually mattered. `onerror` had never fired in this suite
+  // before this test.
+  socket.onerror?.call(socket, new Event('error'));
+  socket.onclose?.call(socket, new CloseEvent('close', { code: 1006, wasClean: false }));
+
+  await expect(first).rejects.toThrow('buildql: subscription socket error');
 });
 
 it('does not leave an unhandled rejection when onopen fails to send, and surfaces the failure instead', async () => {

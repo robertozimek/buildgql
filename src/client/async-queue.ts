@@ -20,6 +20,7 @@ export class AsyncQueue<T> implements AsyncIterable<T> {
     wake?.();
   }
 
+  /** No-op once the queue has been closed or has failed — the item is discarded, not buffered. */
   push(item: T): void {
     if (this.done) return;
     this.items.push(item);
