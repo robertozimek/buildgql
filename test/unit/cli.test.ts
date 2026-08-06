@@ -109,6 +109,29 @@ it('main() generate returns 1 without throwing when no config is present', async
   expect(written(stderrSpy)).toContain('buildql: no config found');
 });
 
+it('prefixes a raw, non-buildql error before it reaches the reporter', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-main-'));
+  await copyFile(sdlPath, join(dir, 'schema.graphql'));
+  // A plain FILE sits where the output path needs an intermediate DIRECTORY, so
+  // `mkdir(..., { recursive: true })` inside generate() fails with a raw ENOTDIR — a real
+  // Node fs error, not one of buildql's own `throw new Error('buildql: ...')` calls.
+  await writeFile(join(dir, 'blocker'), '');
+  await writeFile(
+    join(dir, 'buildql.config.mjs'),
+    "export default { schema: './schema.graphql', output: './blocker/nested' };\n",
+  );
+  const reporter = collectingReporter();
+
+  const code = await main(['generate', '--config', dir], reporter);
+
+  expect(code).toBe(1);
+  expect(reporter.warns).toHaveLength(1);
+  expect(reporter.warns[0]).toMatch(/^buildql: /);
+  // Proves this really is the unwrapped fs error being prefixed, not a coincidence: no
+  // `buildql: ...` message anywhere in the codebase mentions ENOTDIR.
+  expect(reporter.warns[0]).toContain('ENOTDIR');
+});
+
 it('generates a module bound to the configured client', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
   await copyFile(sdlPath, join(dir, 'schema.graphql'));

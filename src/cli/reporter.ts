@@ -8,7 +8,15 @@
 export interface Reporter {
   /** Progress: which config was used, what was written. */
   info(message: string): void;
-  /** Something degraded but did not fail — e.g. a scalar generated as `unknown`. */
+  /**
+   * A diagnostic that reaches the caller as a message rather than a thrown exception.
+   * Covers two distinct cases: something degraded but the pipeline still produced output
+   * (e.g. a scalar generated as `unknown`, from `generate` itself), and `main` having
+   * caught a fatal error and turned it into text before returning a nonzero exit code
+   * instead of letting it propagate. The two are not distinguishable through this call —
+   * `main`'s return value is the actual pass/fail signal; this is only ever the message
+   * that goes with it.
+   */
   warn(message: string): void;
 }
 
