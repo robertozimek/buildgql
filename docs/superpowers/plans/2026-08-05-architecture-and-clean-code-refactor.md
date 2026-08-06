@@ -2472,7 +2472,7 @@ git commit -m "test: pin the public API surface and document conventions"
 
 ### Task 14: Fix the list-type precedence bug in `inputTsType`
 
-Added after the plan was approved, from a question about how `scalars` handles complex types. The `scalars` config value is a TypeScript type *expression* spliced raw into generated source, so `{ Point: '{ x: number; y: number }' }` and `{ JSON: 'Record<string, unknown>' }` both work. But `inputTsType` builds list types by string concatenation without parenthesising, so a scalar mapped to a **union** produces the wrong type in list input positions.
+Added after the plan was approved, from a question about how `scalars` handles complex types. The `scalars` config value is a TypeScript type _expression_ spliced raw into generated source, so `{ Point: '{ x: number; y: number }' }` and `{ JSON: 'Record<string, unknown>' }` both work. But `inputTsType` builds list types by string concatenation without parenthesising, so a scalar mapped to a **union** produces the wrong type in list input positions.
 
 Reproduced against the current emitter with `{ JSON: 'string | number' }` and a `[JSON!]` argument:
 
@@ -2489,10 +2489,12 @@ Note the nullable-element branch already parenthesises (`(${out} | null)[]`); on
 **Runs after Task 11**, which moves this function from `src/codegen/emit.ts` to `src/codegen/ts-types.ts`. If Task 11 has not run, apply the change in `emit.ts` instead — the function body is identical.
 
 **Files:**
+
 - Modify: `src/codegen/ts-types.ts` (`inputTsType`; `emit.ts` if Task 11 has not run)
 - Test: `test/unit/ts-types.test.ts` (create)
 
 **Interfaces:**
+
 - Consumes: Task 11's `src/codegen/ts-types.ts` exporting `inputTsType(ref: IRTypeRef, ir: IRSchema): string`
 - Produces: no signature change. `inputTsType` gains a module-private helper `isAtomicTypeExpression(type: string): boolean`.
 
@@ -2512,7 +2514,14 @@ function schemaWithScalars(scalars: Record<string, string>): IRSchema {
     mutationType: null,
     subscriptionType: null,
     types: [],
-    scalars: { ID: 'string', String: 'string', Int: 'number', Float: 'number', Boolean: 'boolean', ...scalars },
+    scalars: {
+      ID: 'string',
+      String: 'string',
+      Int: 'number',
+      Float: 'number',
+      Boolean: 'boolean',
+      ...scalars,
+    },
   };
 }
 
@@ -2580,7 +2589,8 @@ Then, in `inputTsType`, wrap the base once before the wrapper walk:
 
 ```ts
 export function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
-  const base = ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
+  const base =
+    ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
   // Only the base needs the atomicity guard: every later iteration appends to a
   // string already ending in `[]`, which binds tightly on its own.
