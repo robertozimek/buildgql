@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { emit, unmappedScalars } from '../codegen/emit.js';
 import { buildIR } from '../codegen/ir.js';
 import { loadSchema } from '../codegen/introspect.js';
@@ -80,8 +81,41 @@ export async function main(argv: string[]): Promise<number> {
   }
 }
 
+/**
+ * True when `moduleUrl` is the module Node was actually asked to run.
+ *
+ * Both sides are resolved through `realpathSync` before comparing, because they arrive in
+ * different forms: Node resolves `import.meta.url` to the file's REALPATH, while
+ * `process.argv[1]` keeps whatever path the caller typed. Every symlinking installer —
+ * pnpm by default, npm workspaces, `npm link` — puts `node_modules/buildql` behind a
+ * symlink into a content-addressed store, so a raw string comparison is false for all of
+ * them. The failure is silent and looks like success: `main()` never runs, nothing is
+ * generated, and the process still exits 0.
+ *
+ * (Resolving both sides also covers macOS, where `/var` is itself a symlink to
+ * `/private/var`, so even an unsymlinked temp path disagrees with its own realpath.)
+ */
+export function isEntrypoint(moduleUrl: string, argv1: string | undefined): boolean {
+  if (!argv1) return false;
+  // A path that no longer exists must compare unequal, not throw.
+  const real = (p: string): string => {
+    try {
+      return realpathSync(p);
+    } catch {
+      return p;
+    }
+  };
+  let modulePath: string;
+  try {
+    modulePath = fileURLToPath(moduleUrl);
+  } catch {
+    return false;
+  }
+  return real(modulePath) === real(argv1);
+}
+
 // Only run when invoked as the binary, not when imported by tests.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (isEntrypoint(import.meta.url, process.argv[1])) {
   main(process.argv.slice(2)).then((code) => {
     process.exitCode = code;
   });
