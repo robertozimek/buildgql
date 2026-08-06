@@ -82,7 +82,8 @@ export const INTROSPECTION_QUERY = `query IntrospectionQuery {
 }`.replace(/\s+/g, ' ');
 
 export interface LoadOptions {
-  readonly headers?: Record<string, string>;
+  /** `| undefined` is explicit: callers forward a possibly-absent `config.headers` directly. */
+  readonly headers?: Record<string, string> | undefined;
   readonly fetch?: typeof fetch;
 }
 

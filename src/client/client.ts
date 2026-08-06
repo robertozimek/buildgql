@@ -65,7 +65,8 @@ export function createClient(options: ClientOptions): Client {
       const res = await doFetch(options.url, {
         method: 'POST',
         headers,
-        signal: opts?.signal,
+        // `RequestInit.signal` is `AbortSignal | null`; `??` bridges our `undefined`.
+        signal: opts?.signal ?? null,
         body: JSON.stringify({
           query: op.document,
           operationName: op.name,
