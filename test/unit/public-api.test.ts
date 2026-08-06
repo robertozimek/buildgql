@@ -8,6 +8,8 @@ it('exports exactly the documented public surface', () => {
   // exports (e.g. `Client`, `HeadersSource`) are erased at compile time and never appear in
   // `Object.keys` here — that's why a value export that gets demoted to `export type` also
   // trips this check: it silently disappears from this list, same as an outright removal.
+  // The type-only export names this test can't see are separately locked, against BUILT
+  // output, by test/built/type-surface.test.ts.
   expect(Object.keys(api).sort()).toEqual(
     [
       'BuildQLError',
