@@ -182,12 +182,29 @@ describe('published entry points', () => {
   // calls `main()` unconditionally on load. Importing it in-process here would run `main()`
   // against THIS test process's own argv and set `process.exitCode` on the test runner
   // itself, corrupting the very run that's meant to verify it. So it is spawned as a real
-  // child process instead, which is also a strictly stronger check: it proves the shebang
-  // line works, not just that the module graph resolves.
+  // child process instead. This proves the compiled entry actually starts up, resolves its
+  // module graph, and produces the right stdout under Node — NOT that the shebang line
+  // works: `execFile(process.execPath, [bin, ...])` invokes `node <file>` directly, which
+  // never reads the shebang at all. The assertion below (`keeps the shebang on the CLI
+  // binary...`) is the one that actually covers the shebang, by reading the file's first
+  // bytes.
   it('runs as a real child process and prints usage on --help', async () => {
     const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
     const { stdout } = await execFileAsync(process.execPath, [bin, '--help']);
     expect(stdout).toContain('type-safe GraphQL query builder codegen');
+  });
+
+  // `bin.ts` returns its exit code through `void main(...).then((code) => { process.exitCode
+  // = code })` — nothing else makes the child process actually exit nonzero on failure. The
+  // test above only ever invokes `--help`, which succeeds, so it cannot catch that wiring
+  // being dropped (e.g. by an `await`-based refactor that loses the assignment, or by the
+  // `.then` being deleted outright — the child would still print its error text to stderr
+  // and exit 0, indistinguishable from success to any script piping into it). Spawning with a
+  // deliberately-unknown command forces the failing path and asserts on `execFile`'s own
+  // rejection, which `promisify` produces only for a nonzero exit code.
+  it('exits nonzero when the command fails, not just zero when it succeeds', async () => {
+    const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
+    await expect(execFileAsync(process.execPath, [bin, 'bogus'])).rejects.toMatchObject({ code: 1 });
   });
 });
 
