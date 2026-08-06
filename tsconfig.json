@@ -5,7 +5,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
-    "exactOptionalPropertyTypes": false,
+    "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": false,
     "declaration": true,
     "skipLibCheck": true,
