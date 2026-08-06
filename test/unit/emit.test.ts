@@ -302,6 +302,15 @@ describe('unmappedScalars', () => {
 describe('emit — client option', () => {
   it('defaults to buildql: imports and re-exports createClient', async () => {
     const src = await generated();
+    // Pins the whole sorted import block, not just `createClient`'s presence: this is the
+    // plan's #1 binding constraint — `client: 'buildql'` output must stay byte-identical to
+    // what the emitter produced before this feature existed, and a `toContain` on a single
+    // line would pass even if the sorted list were reordered around it.
+    expect(src).toContain(
+      "import {\n  args,\n  createClient,\n  include,\n  leaf,\n  leafArgs,\n  makeFragment,\n" +
+      "  makeMutation,\n  makeQuery,\n  makeSubscription,\n  object,\n  objectArgs,\n  on,\n" +
+      "  skip,\n  spread,\n  $,\n  v,\n} from 'buildql';\n",
+    );
     expect(src).toContain('  createClient,\n');
     expect(src).toContain('export { $, v, on, spread, include, skip, createClient };');
     expect(src).not.toContain('buildql/adapters');

@@ -170,7 +170,7 @@ export default defineConfig({
 **Apollo Client:**
 
 ```ts
-import { query, mutation, $, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
+import { query, mutation, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
 import { useQuery } from '@apollo/client';
 
 const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
@@ -193,13 +193,14 @@ take the same `{ query, variables }` shape. Passing a mutation to `toApolloQuery
 **urql:**
 
 ```ts
-import { query, mutation, $, toUrqlArgs, urqlDocument } from './src/gql';
+import { query, mutation, toUrqlArgs, urqlDocument } from './src/gql';
 import { useQuery, useMutation } from 'urql';
 
 const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
 const CreateUser = mutation('CreateUser', ($, M) => [M.createUser({ name: $.name }, (U) => [U.id])]);
 
-// urql uses `{ query, variables }` for queries, mutations and subscriptions alike.
+// urql's useQuery/useSubscription take { query, variables }; useMutation and the
+// positional client methods take the document on its own — use urqlDocument for those.
 const [result] = useQuery(toUrqlArgs(UserById, { id: '7' }));
 //     ^? { data?: { user: { id: string; firstName: string } } }
 
@@ -224,8 +225,10 @@ import { toUrqlArgs } from 'buildql/adapters/urql';
 ```
 
 Adapters need the `graphql` package installed — they parse the printed document into
-the AST these clients require. Setting `client: 'none'` binds no client at all, if you
-want to wire one up yourself.
+the AST these clients require. If it isn't installed, the import fails with Node's
+`ERR_MODULE_NOT_FOUND` (`Cannot find package 'graphql'`) rather than a `buildql:` message
+— the adapters import it statically so the adapter functions can stay synchronous. Setting
+`client: 'none'` binds no client at all, if you want to wire one up yourself.
 
 ## Relay
 

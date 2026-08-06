@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
 import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery, makeSubscription } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
 import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
 import { toUrqlArgs, urqlDocument } from '../../src/adapters/urql.js';
+import { CLIENT_EMITS, CLIENT_KINDS } from '../../src/codegen/clients.js';
 
 const User = {
   id: leaf<'id', ['!'], string>('id', ['!']),
@@ -120,11 +122,33 @@ describe('urql adapter', () => {
     expect(toUrqlArgs(Users).variables).toEqual({});
   });
 
-  it('accepts every operation kind, because urql keys all three off `query`', () => {
-    // Unlike Apollo, urql's useQuery/useMutation/useSubscription and the equivalent
-    // client methods all take the document under `query` — so there is nothing here that
-    // a kind guard could catch.
+  it('accepts every operation kind — urqlDocument is kind-agnostic', () => {
+    // urql's *document* parameter (unlike Apollo's, which is wrapped in a kind-specific
+    // `{ query }`/`{ mutation }` options object) takes any operation kind directly, so
+    // `urqlDocument` works for all three and there is nothing a kind guard could catch here.
     expect(toUrqlArgs(CreateUser, { name: 'Ada' }).query).toBe(toDocument(CreateUser));
     expect(toUrqlArgs(Ticks).query).toBe(toDocument(Ticks));
+  });
+});
+
+describe('client registry', () => {
+  it('the client registry matches each adapter module and the published export map', async () => {
+    const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
+    for (const kind of CLIENT_KINDS) {
+      const { module, names } = CLIENT_EMITS[kind];
+      if (!module || module === 'buildql') continue;
+      const subpath = module.replace('buildql', '.');
+      expect(pkg.exports[subpath], `${module} is not in package.json exports`).toBeDefined();
+      const typesKey = subpath.slice(2);
+      expect(pkg.typesVersions['*'][typesKey]).toBeDefined();
+      // Vite's static analysis rewrites a template literal directly inside `import()` into
+      // a glob lookup, which fails here because the path is only known at test-run time. A
+      // plain variable computed beforehand bypasses that analysis and reaches Node's loader
+      // unchanged.
+      const adapterName = typesKey.split('/').pop()!;
+      const modUrl = new URL(`../../src/adapters/${adapterName}.js`, import.meta.url).href;
+      const mod = await import(modUrl);
+      expect(Object.keys(mod).sort()).toEqual([...names].sort());
+    }
   });
 });
