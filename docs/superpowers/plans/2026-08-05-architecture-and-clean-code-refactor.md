@@ -449,8 +449,6 @@ const q = query('User', ($, Q) => [Q.user({ id: v('id') }, (U) => [U.name])]);
 ```
 ````
 
-````
-
 - [ ] **Step 6: Verify and commit**
 
 Run: `npm run check`
@@ -459,7 +457,7 @@ Expected: PASS
 ```bash
 git add test/types/nuia package.json README.md
 git commit -m "docs(types): pin and document the noUncheckedIndexedAccess limitation"
-````
+```
 
 ---
 
