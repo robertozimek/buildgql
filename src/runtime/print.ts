@@ -11,6 +11,11 @@ import { ENUM, VAR_REF, isEnumValue, isVarRefValue } from './markers.js';
 
 /** GraphQL value literal serialisation. Enum values arrive pre-marked by codegen. */
 function printValue(value: unknown): string {
+  // Order is load-bearing: `Object.entries` (in the generic object branch below) does not
+  // enumerate symbol keys, so once a value reaches that branch its marker brand — if it had
+  // one — is invisible. The marker checks must run first to see it. Under the old string-key
+  // markers a misordering here still printed something visibly wrong (`{__enum: "X"}`); with
+  // symbol keys the same mistake would instead silently print `{}`, losing the value.
   if (isVarRefValue(value)) return `$${value[VAR_REF]}`;
   if (value === null || value === undefined) return 'null';
   if (isEnumValue(value)) return value[ENUM];
