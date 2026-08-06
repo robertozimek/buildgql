@@ -1,13 +1,13 @@
-import type { DirectiveNode, Sel } from '../types/node.js';
+import type { Directive, FieldSelection } from '../types/selection.js';
 import type { VarMarker } from '../types/vars.js';
 import { isVarMarker, markerName } from './var.js';
 
 function applyDirective<N extends string, R, V, Name extends string>(
-  sel: Sel<N, R, V, boolean>,
+  sel: FieldSelection<N, R, V, boolean>,
   name: 'include' | 'skip',
   cond: boolean | VarMarker<Name>,
-): Sel<N, R, V & { [P in Name]: boolean }, true> {
-  let directive: DirectiveNode;
+): FieldSelection<N, R, V & { [P in Name]: boolean }, true> {
+  let directive: Directive;
   if (typeof cond === 'boolean') {
     directive = { name, if: cond };
   } else {
@@ -25,9 +25,9 @@ function applyDirective<N extends string, R, V, Name extends string>(
   }
   const next = { ...sel, directives: [...(sel.directives ?? []), directive] };
   // Attaches the phantom `R`/`V`/`O` parameters to the spread runtime object —
-  // `Sel`'s type-level fields carry no runtime representation, so the widened
+  // `FieldSelection`'s type-level fields carry no runtime representation, so the widened
   // return type cannot be derived structurally from `next` alone.
-  return next as unknown as Sel<N, R, V & { [P in Name]: boolean }, true>;
+  return next as unknown as FieldSelection<N, R, V & { [P in Name]: boolean }, true>;
 }
 
 /**
@@ -39,30 +39,33 @@ function applyDirective<N extends string, R, V, Name extends string>(
  * the whole operation untypeable by its caller.
  */
 export function include<N extends string, R, V>(
-  sel: Sel<N, R, V, boolean>,
+  sel: FieldSelection<N, R, V, boolean>,
   cond: boolean,
-): Sel<N, R, V, true>;
+): FieldSelection<N, R, V, true>;
 export function include<N extends string, R, V, Name extends string>(
-  sel: Sel<N, R, V, boolean>,
+  sel: FieldSelection<N, R, V, boolean>,
   cond: VarMarker<Name>,
-): Sel<N, R, V & { [P in Name]: boolean }, true>;
+): FieldSelection<N, R, V & { [P in Name]: boolean }, true>;
 /** Include this field only when the condition is true. Makes the result field optional. */
 export function include<N extends string, R, V, Name extends string>(
-  sel: Sel<N, R, V, boolean>,
+  sel: FieldSelection<N, R, V, boolean>,
   cond: boolean | VarMarker<Name>,
-): Sel<N, R, V & { [P in Name]: boolean }, true> {
+): FieldSelection<N, R, V & { [P in Name]: boolean }, true> {
   return applyDirective(sel, 'include', cond);
 }
 
-export function skip<N extends string, R, V>(sel: Sel<N, R, V, boolean>, cond: boolean): Sel<N, R, V, true>;
+export function skip<N extends string, R, V>(
+  sel: FieldSelection<N, R, V, boolean>,
+  cond: boolean,
+): FieldSelection<N, R, V, true>;
 export function skip<N extends string, R, V, Name extends string>(
-  sel: Sel<N, R, V, boolean>,
+  sel: FieldSelection<N, R, V, boolean>,
   cond: VarMarker<Name>,
-): Sel<N, R, V & { [P in Name]: boolean }, true>;
+): FieldSelection<N, R, V & { [P in Name]: boolean }, true>;
 /** Skip this field when the condition is true. Makes the result field optional. */
 export function skip<N extends string, R, V, Name extends string>(
-  sel: Sel<N, R, V, boolean>,
+  sel: FieldSelection<N, R, V, boolean>,
   cond: boolean | VarMarker<Name>,
-): Sel<N, R, V & { [P in Name]: boolean }, true> {
+): FieldSelection<N, R, V & { [P in Name]: boolean }, true> {
   return applyDirective(sel, 'skip', cond);
 }

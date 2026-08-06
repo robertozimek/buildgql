@@ -1,7 +1,12 @@
-import type { AnySel, DirectiveNode, Node, On, Spread, SpreadTarget, VarRef } from '../types/node.js';
-
-/** Identical in shape to `SpreadTarget` — a fragment definition is exactly what a spread points at. */
-export type FragmentDef = SpreadTarget;
+import type {
+  AnyFieldSelection,
+  Directive,
+  FragmentDefinition,
+  FragmentSpread,
+  InlineFragment,
+  SelectionNode,
+  VarRef,
+} from '../types/selection.js';
 
 interface VarRefMarker {
   readonly __varRef: string;
@@ -41,7 +46,7 @@ function printArgs(argv: Record<string, unknown> | undefined): string {
   return `(${entries.map(([k, v]) => `${k}: ${printValue(v)}`).join(', ')})`;
 }
 
-function printDirectives(ds: readonly DirectiveNode[] | undefined): string {
+function printDirectives(ds: readonly Directive[] | undefined): string {
   if (!ds || ds.length === 0) return '';
   return ds
     .map((d) => {
@@ -51,40 +56,40 @@ function printDirectives(ds: readonly DirectiveNode[] | undefined): string {
     .join('');
 }
 
-function printNode(n: Node): string {
-  if (n.kind === 'spread') return `...${(n as Spread<unknown>).handle.name}`;
+function printNode(n: SelectionNode): string {
+  if (n.kind === 'spread') return `...${(n as FragmentSpread<unknown>).fragment.name}`;
   if (n.kind === 'on') {
-    const o = n as On<string, unknown>;
+    const o = n as InlineFragment<string, unknown>;
     return `... on ${o.typename} ${printSels(o.sels)}`;
   }
-  const s = n as AnySel;
+  const s = n as AnyFieldSelection;
   const head = s.alias ? `${s.alias}: ${s.name}` : s.name;
   const body = s.sels && s.sels.length > 0 ? ` ${printSels(s.sels)}` : '';
   return `${head}${printArgs(s.args)}${printDirectives(s.directives)}${body}`;
 }
 
-function printSels(sels: readonly Node[]): string {
+function printSels(sels: readonly SelectionNode[]): string {
   const hasInline = sels.some((n) => n.kind === 'on');
-  const hasTypename = sels.some((n) => n.kind === 'field' && (n as AnySel).name === '__typename');
+  const hasTypename = sels.some((n) => n.kind === 'field' && (n as AnyFieldSelection).name === '__typename');
   const parts = sels.map(printNode);
   if (hasInline && !hasTypename) parts.unshift('__typename');
   return `{ ${parts.join(' ')} }`;
 }
 
 /** Walks the whole tree, including inline fragments, spreads and directives. */
-export function collectVarRefs(sels: readonly Node[]): VarRef[] {
+export function collectVarRefs(sels: readonly SelectionNode[]): VarRef[] {
   const out: VarRef[] = [];
-  const walk = (nodes: readonly Node[]): void => {
+  const walk = (nodes: readonly SelectionNode[]): void => {
     for (const n of nodes) {
       if (n.kind === 'on') {
-        walk((n as On<string, unknown>).sels);
+        walk((n as InlineFragment<string, unknown>).sels);
         continue;
       }
       if (n.kind === 'spread') {
-        walk(n.handle.sels);
+        walk(n.fragment.sels);
         continue;
       }
-      const s = n as AnySel;
+      const s = n as AnyFieldSelection;
       if (s.varRefs) out.push(...s.varRefs);
       for (const d of s.directives ?? []) {
         if (typeof d.if !== 'boolean') out.push(d.if);
@@ -114,8 +119,8 @@ function dedupeVarRefs(refs: readonly VarRef[]): VarRef[] {
 export function printOperation(
   kind: 'query' | 'mutation' | 'subscription',
   name: string,
-  sels: readonly Node[],
-  fragments: readonly FragmentDef[] = [],
+  sels: readonly SelectionNode[],
+  fragments: readonly FragmentDefinition[] = [],
 ): string {
   const vars = dedupeVarRefs(collectVarRefs(sels));
   const sig = vars.length > 0 ? `(${vars.map((v) => `$${v.varName}: ${v.gqlType}`).join(', ')})` : '';

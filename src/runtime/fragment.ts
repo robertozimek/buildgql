@@ -1,27 +1,31 @@
-import type { Node, On, Spread, SpreadTarget } from '../types/node.js';
+import type {
+  FragmentDefinition,
+  FragmentSpread,
+  InlineFragment,
+  SelectionNode,
+} from '../types/selection.js';
 import type { Selected, VarsIn } from '../types/select.js';
 import type { RESULT, VARS } from '../types/symbols.js';
-import type { FragmentDef } from './print.js';
 
-export interface FragmentHandle<R, V> extends SpreadTarget {
+export interface Fragment<R, V> extends FragmentDefinition {
   readonly [RESULT]?: R;
   readonly [VARS]?: V;
 }
 
 /** Codegen emits one of these per object type so the type condition is fixed. */
 export function makeFragment<F>(typeCondition: string, fields: F) {
-  return <S extends readonly Node[]>(
+  return <S extends readonly SelectionNode[]>(
     name: string,
     pick: (f: F) => readonly [...S],
-  ): FragmentHandle<Selected<S>, VarsIn<S>> =>
-    ({ name, typeCondition, sels: pick(fields) }) as FragmentHandle<Selected<S>, VarsIn<S>>;
+  ): Fragment<Selected<S>, VarsIn<S>> =>
+    ({ name, typeCondition, sels: pick(fields) }) as Fragment<Selected<S>, VarsIn<S>>;
 }
 
-export function spread<R, V>(f: FragmentHandle<R, V>): Spread<R, V> {
-  // Phantom attachment only: `handle: f` is the real runtime value already
-  // shaped like `SpreadTarget`; the cast exists solely to stamp the `R`/`V`
-  // type parameters onto the returned `Spread`.
-  return { kind: 'spread', handle: f } as unknown as Spread<R, V>;
+export function spread<R, V>(f: Fragment<R, V>): FragmentSpread<R, V> {
+  // Phantom attachment only: `fragment: f` is the real runtime value already
+  // shaped like `FragmentDefinition`; the cast exists solely to stamp the `R`/`V`
+  // type parameters onto the returned `FragmentSpread`.
+  return { kind: 'spread', fragment: f } as unknown as FragmentSpread<R, V>;
 }
 
 /**
@@ -33,29 +37,29 @@ export function spread<R, V>(f: FragmentHandle<R, V>): Spread<R, V> {
  * places is fine and must not throw, so handles are compared by identity, not name
  * alone (mirrors `dedupeVarRefs` in `print.ts`, which does the same for variables).
  */
-export function collectFragments(sels: readonly Node[]): FragmentDef[] {
-  const found = new Map<string, SpreadTarget>();
-  const walk = (nodes: readonly Node[]): void => {
+export function collectFragments(sels: readonly SelectionNode[]): FragmentDefinition[] {
+  const found = new Map<string, FragmentDefinition>();
+  const walk = (nodes: readonly SelectionNode[]): void => {
     for (const n of nodes) {
       if (n.kind === 'spread') {
-        const seen = found.get(n.handle.name);
-        if (seen && seen !== n.handle) {
+        const seen = found.get(n.fragment.name);
+        if (seen && seen !== n.fragment) {
           throw new Error(
-            `buildql: two different fragments are both named "${n.handle.name}". ` +
+            `buildql: two different fragments are both named "${n.fragment.name}". ` +
               'Fragment names must be unique — give one of them a different name.',
           );
         }
         if (!seen) {
-          found.set(n.handle.name, n.handle);
-          walk(n.handle.sels);
+          found.set(n.fragment.name, n.fragment);
+          walk(n.fragment.sels);
         }
         continue;
       }
       if (n.kind === 'on') {
-        walk((n as On<string, unknown>).sels);
+        walk((n as InlineFragment<string, unknown>).sels);
         continue;
       }
-      const sel = n as { sels?: readonly Node[] };
+      const sel = n as { sels?: readonly SelectionNode[] };
       if (sel.sels) walk(sel.sels);
     }
   };

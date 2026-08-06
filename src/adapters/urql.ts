@@ -1,5 +1,5 @@
 import type { Operation } from '../runtime/operation.js';
-import type { VarsArg } from '../types/varargs.js';
+import type { VarsArg } from '../types/vars.js';
 import { toDocument } from './document.js';
 import type { TypedDocumentNode } from './document.js';
 

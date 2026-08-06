@@ -1,30 +1,36 @@
-import type { AnySel, Node, On, Sel, Spread } from './node.js';
-import type { KEY, RESULT, VARS } from './symbols.js';
+import type { FieldSelection, FragmentSpread, InlineFragment, SelectionNode } from './selection.js';
+import type { VARS } from './symbols.js';
 import type { Simplify, UnionToIntersection } from './util.js';
 
-type KeyOf<E> = E extends Sel<infer N, unknown, unknown, boolean> ? N : never;
-type ResOf<E> = E extends Sel<string, infer R, unknown, boolean> ? R : never;
+type KeyOf<E> = E extends FieldSelection<infer N, unknown, unknown, boolean> ? N : never;
+type ResOf<E> = E extends FieldSelection<string, infer R, unknown, boolean> ? R : never;
 
-type RequiredSels<S extends readonly Node[]> = Extract<S[number], Sel<string, unknown, unknown, false>>;
-type OptionalSels<S extends readonly Node[]> = Extract<S[number], Sel<string, unknown, unknown, true>>;
+type RequiredSels<S extends readonly SelectionNode[]> = Extract<
+  S[number],
+  FieldSelection<string, unknown, unknown, false>
+>;
+type OptionalSels<S extends readonly SelectionNode[]> = Extract<
+  S[number],
+  FieldSelection<string, unknown, unknown, true>
+>;
 
-type PlainFields<S extends readonly Node[]> = { [E in RequiredSels<S> as KeyOf<E>]: ResOf<E> } & {
+type PlainFields<S extends readonly SelectionNode[]> = { [E in RequiredSels<S> as KeyOf<E>]: ResOf<E> } & {
   [E in OptionalSels<S> as KeyOf<E>]?: ResOf<E>;
 };
 
 /**
  * Fragment spreads merge into the parent object.
  * Written in the distributive `S[number] extends infer E` form on purpose:
- * `Extract<S[number], Spread<unknown, unknown>> extends Spread<infer R, unknown>` is NOT a
+ * `Extract<S[number], FragmentSpread<unknown, unknown>> extends FragmentSpread<infer R, unknown>` is NOT a
  * naked type parameter, so it collapses the union instead of mapping over it.
  */
-type SpreadFields<S extends readonly Node[]> = UnionToIntersection<
-  S[number] extends infer E ? (E extends Spread<infer R, unknown> ? R : {}) : never
+type SpreadFields<S extends readonly SelectionNode[]> = UnionToIntersection<
+  S[number] extends infer E ? (E extends FragmentSpread<infer R, unknown> ? R : {}) : never
 >;
 
 /** The union of inline-fragment branches, or `never` when there are none. */
-type OnBranches<S extends readonly Node[]> = S[number] extends infer E
-  ? E extends On<string, infer R, unknown>
+type OnBranches<S extends readonly SelectionNode[]> = S[number] extends infer E
+  ? E extends InlineFragment<string, infer R, unknown>
     ? R
     : never
   : never;
@@ -35,7 +41,7 @@ type OnBranches<S extends readonly Node[]> = S[number] extends infer E
  * common fields are distributed across every branch, producing a discriminated
  * union that narrows on `__typename`.
  */
-export type Selected<S extends readonly Node[]> = [OnBranches<S>] extends [never]
+export type Selected<S extends readonly SelectionNode[]> = [OnBranches<S>] extends [never]
   ? Simplify<PlainFields<S> & SpreadFields<S>>
   : Simplify<PlainFields<S> & SpreadFields<S>> extends infer Common
     ? OnBranches<S> extends infer B
@@ -48,10 +54,8 @@ export type Selected<S extends readonly Node[]> = [OnBranches<S>] extends [never
 /**
  * Union of every variable map contributed anywhere in a selection tuple.
  */
-export type VarsIn<S extends readonly Node[]> = UnionToIntersection<
+export type VarsIn<S extends readonly SelectionNode[]> = UnionToIntersection<
   {
     [I in keyof S]: S[I] extends { readonly [VARS]?: infer V } ? (V extends undefined ? {} : V) : {};
   }[number]
 >;
-
-export type { AnySel, Node, On, Sel, Spread, KEY, RESULT, VARS };

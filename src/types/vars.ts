@@ -1,4 +1,4 @@
-import type { UnionToIntersection } from './util.js';
+import type { RequiredKeys, UnionToIntersection } from './util.js';
 
 /**
  * A placeholder standing in for a GraphQL variable.
@@ -55,3 +55,19 @@ export type VarProxy = { readonly [K in string]: VarMarker };
 // `IsOpt` and `VarEntry` stay file-local: they are composition helpers for
 // `VarsOf` with no consumer elsewhere, and exporting them would put untested
 // types on the public API surface.
+
+/**
+ * True when the operation declared at least one REQUIRED variable — an all-optional
+ * variable map (e.g. `{ after?: string }`) must not force a positional `vars` argument.
+ */
+export type HasVars<V> = RequiredKeys<V> extends never ? false : true;
+
+/**
+ * The trailing parameter list carrying an operation's variables, and nothing else.
+ * `NoInfer` stops `V` being re-inferred from the argument, which would otherwise let a
+ * pre-declared object with missing keys through silently.
+ *
+ * `client.execute`/`client.subscribe` need a second `ExecuteOptions` slot as well, so they
+ * build their own tuple from `HasVars` rather than using this alias — see `create-client.ts`.
+ */
+export type VarsArg<V> = HasVars<V> extends true ? [vars: NoInfer<V>] : [vars?: NoInfer<V>];

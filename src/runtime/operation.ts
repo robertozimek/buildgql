@@ -1,4 +1,4 @@
-import type { Node } from '../types/node.js';
+import type { SelectionNode } from '../types/selection.js';
 import type { Selected, VarsIn } from '../types/select.js';
 import type { RESULT, VARS } from '../types/symbols.js';
 import type { Simplify } from '../types/util.js';
@@ -11,14 +11,14 @@ export interface Operation<R, V> {
   readonly kind: 'query' | 'mutation' | 'subscription';
   readonly name: string;
   readonly document: string;
-  readonly sels: readonly Node[];
+  readonly sels: readonly SelectionNode[];
   readonly [RESULT]?: R;
   readonly [VARS]?: V;
 }
 
 function makeOperation(kind: Operation<unknown, unknown>['kind']) {
   return <Root>(root: Root) =>
-    <S extends readonly Node[]>(
+    <S extends readonly SelectionNode[]>(
       name: string,
       build: (v: VarProxy, r: Root) => readonly [...S],
     ): Operation<Selected<S>, Simplify<VarsIn<S>>> => {
