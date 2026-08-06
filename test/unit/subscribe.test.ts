@@ -224,7 +224,7 @@ it('surfaces the server-provided detail from a WS `error` message', async () => 
   });
 
   await expect(first).rejects.toMatchObject({
-    name: 'GraphQLResponseError',
+    name: 'BuildQLResponseError',
     message: expect.stringContaining('Syntax Error: Unexpected Name "bogus"'),
     errors: [{ message: 'Syntax Error: Unexpected Name "bogus"' }],
   });
