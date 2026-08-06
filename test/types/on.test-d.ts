@@ -1,4 +1,4 @@
-import { leaf, object } from '../../src/runtime/builders.js';
+import { leafField, objectField } from '../../src/runtime/builders.js';
 import { on } from '../../src/runtime/on.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 import type { RESULT } from '../../src/types/symbols.js';
@@ -7,16 +7,16 @@ type Expect<T extends true> = T;
 type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const Dog = {
-  name: leaf<'name', ['!'], string>('name', ['!']),
-  breed: leaf<'breed', ['!'], string>('breed', ['!']),
+  name: leafField<'name', ['!'], string>('name', ['!']),
+  breed: leafField<'breed', ['!'], string>('breed', ['!']),
 };
 const Cat = {
-  name: leaf<'name', ['!'], string>('name', ['!']),
-  lives: leaf<'lives', ['!'], number>('lives', ['!']),
+  name: leafField<'name', ['!'], string>('name', ['!']),
+  lives: leafField<'lives', ['!'], number>('lives', ['!']),
 };
 // A union's own field map exposes only the interface/common fields.
-const Pet = { name: leaf<'name', ['!'], string>('name', ['!']) };
-const Query = { pet: object('pet', ['!'], Pet) };
+const Pet = { name: leafField<'name', ['!'], string>('name', ['!']) };
+const Query = { pet: objectField('pet', ['!'], Pet) };
 const query = makeQuery(Query);
 
 const q = query('Pet', ($, Q) => [

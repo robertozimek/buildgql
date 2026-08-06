@@ -1,33 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
+import { argSpec, leafField, objectField, objectFieldArgs } from '../../src/runtime/builders.js';
 import { $, v } from '../../src/runtime/var.js';
 
-const User = { id: leaf<'id', ['!'], string>('id', ['!']) };
+const User = { id: leafField<'id', ['!'], string>('id', ['!']) };
 
-describe('leaf', () => {
+describe('leafField', () => {
   it('produces a field node', () => {
-    expect(leaf('id', ['!'])).toMatchObject({ kind: 'field', name: 'id' });
+    expect(leafField('id', ['!'])).toMatchObject({ kind: 'field', name: 'id' });
   });
 
   it('records an alias', () => {
-    expect(leaf('id', ['!']).as('postId')).toMatchObject({ kind: 'field', name: 'id', alias: 'postId' });
+    expect(leafField('id', ['!']).as('postId')).toMatchObject({
+      kind: 'field',
+      name: 'id',
+      alias: 'postId',
+    });
   });
 });
 
-describe('object', () => {
+describe('objectField', () => {
   it('nests the picked selections', () => {
-    const node = object('author', ['!'], User)((U) => [U.id]);
+    const node = objectField('author', ['!'], User)((U) => [U.id]);
     expect(node.name).toBe('author');
     expect(node.sels?.map((s) => (s as { name: string }).name)).toEqual(['id']);
   });
 });
 
-describe('objectArgs', () => {
-  const createUser = objectArgs(
+describe('objectFieldArgs', () => {
+  const createUser = objectFieldArgs(
     'createUser',
     ['!'],
     User,
-    args<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
+    argSpec<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
   );
 
   it('keeps literal arguments as values', () => {

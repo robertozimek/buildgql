@@ -1,21 +1,21 @@
 import type { TypedDocumentNode as CoreTypedDocumentNode } from '@graphql-typed-document-node/core';
-import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
+import { argSpec, leafField, objectField, objectFieldArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
 import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
 import { toUrqlArgs, urqlDocument } from '../../src/adapters/urql.js';
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
 };
 
 const query = makeQuery({
-  users: object('users', ['!', 'l', '!'], User),
-  user: objectArgs('user', ['!'], User, args<{ id: string }>({ id: 'ID!' })),
+  users: objectField('users', ['!', 'l', '!'], User),
+  user: objectFieldArgs('user', ['!'], User, argSpec<{ id: string }>({ id: 'ID!' })),
 });
 const mutation = makeMutation({
-  createUser: objectArgs('createUser', ['!'], User, args<{ name: string }>({ name: 'String!' })),
+  createUser: objectFieldArgs('createUser', ['!'], User, argSpec<{ name: string }>({ name: 'String!' })),
 });
 
 export const Users = query('Users', ($, Q) => [Q.users((U) => [U.id])]);

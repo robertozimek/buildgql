@@ -1,14 +1,14 @@
 import { expect, it } from 'vitest';
-import { leaf, object } from '../../src/runtime/builders.js';
+import { leafField, objectField } from '../../src/runtime/builders.js';
 import { include, skip } from '../../src/runtime/directives.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 import { $, v } from '../../src/runtime/var.js';
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  bio: leaf<'bio', ['!'], string>('bio', ['!']),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  bio: leafField<'bio', ['!'], string>('bio', ['!']),
 };
-const query = makeQuery({ me: object('me', ['!'], User) });
+const query = makeQuery({ me: objectField('me', ['!'], User) });
 
 it('prints @include with a variable and hoists it as Boolean!', () => {
   const q = query('Me', ($, Q) => [Q.me((U) => [U.id, include(U.bio, v('withBio'))])]);

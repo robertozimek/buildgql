@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { leaf, object } from '../../src/runtime/builders.js';
+import { leafField, objectField } from '../../src/runtime/builders.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/client.js';
 import { BuildQLHttpError, GraphQLResponseError } from '../../src/client/errors.js';
 
-const User = { id: leaf<'id', ['!'], string>('id', ['!']) };
-const query = makeQuery({ users: object('users', ['!', 'l', '!'], User) });
+const User = { id: leafField<'id', ['!'], string>('id', ['!']) };
+const query = makeQuery({ users: objectField('users', ['!', 'l', '!'], User) });
 const q = query('Users', ($, Q) => [Q.users((U) => [U.id])]);
 
 function jsonResponse(body: unknown, status = 200): Response {

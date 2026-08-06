@@ -1,4 +1,4 @@
-import { leaf, object } from '../../src/runtime/builders.js';
+import { leafField, objectField } from '../../src/runtime/builders.js';
 import { include, skip } from '../../src/runtime/directives.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 import { v } from '../../src/runtime/var.js';
@@ -8,11 +8,11 @@ type Expect<T extends true> = T;
 type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  bio: leaf<'bio', ['!'], string>('bio', ['!']),
-  email: leaf<'email', ['!'], string>('email', ['!']),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  bio: leafField<'bio', ['!'], string>('bio', ['!']),
+  email: leafField<'email', ['!'], string>('email', ['!']),
 };
-const query = makeQuery({ me: object('me', ['!'], User) });
+const query = makeQuery({ me: objectField('me', ['!'], User) });
 
 const q = query('Me', ($, Q) => [
   Q.me((U) => [U.id, include(U.bio, v('withBio')), skip(U.email, v('hideEmail'))]),

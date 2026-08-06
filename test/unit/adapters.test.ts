@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
+import {
+  argSpec,
+  leafField,
+  leafFieldArgs,
+  objectField,
+  objectFieldArgs,
+} from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery, makeSubscription } from '../../src/runtime/operation.js';
 import { toDocument } from '../../src/adapters/document.js';
 import { apolloDocument, toApolloMutation, toApolloQuery } from '../../src/adapters/apollo.js';
@@ -8,8 +14,8 @@ import { toUrqlArgs, urqlDocument } from '../../src/adapters/urql.js';
 import { CLIENT_EMITS, CLIENT_KINDS } from '../../src/codegen/clients.js';
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
 };
 
 // Not exported: the curried builder functions' inferred types reach an unexported
@@ -17,17 +23,17 @@ const User = {
 // but cannot be named") once this file is declaration-checked by `npm run test:types`.
 // Only the resulting Operation values below need to be visible to later appended tests.
 const query = makeQuery({
-  users: object('users', ['!', 'l', '!'], User),
-  user: objectArgs('user', ['!'], User, args<{ id: string }>({ id: 'ID!' })),
+  users: objectField('users', ['!', 'l', '!'], User),
+  user: objectFieldArgs('user', ['!'], User, argSpec<{ id: string }>({ id: 'ID!' })),
 });
 const mutation = makeMutation({
-  createUser: objectArgs('createUser', ['!'], User, args<{ name: string }>({ name: 'String!' })),
+  createUser: objectFieldArgs('createUser', ['!'], User, argSpec<{ name: string }>({ name: 'String!' })),
 });
 const subscription = makeSubscription({
-  ticks: leafArgs<'ticks', ['!'], string, { room?: string }>(
+  ticks: leafFieldArgs<'ticks', ['!'], string, { room?: string }>(
     'ticks',
     ['!'],
-    args<{ room?: string }>({ room: 'String' }),
+    argSpec<{ room?: string }>({ room: 'String' }),
   ),
 });
 

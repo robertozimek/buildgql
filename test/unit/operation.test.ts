@@ -1,12 +1,12 @@
 import { expect, it } from 'vitest';
-import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
+import { argSpec, leafField, objectField, objectFieldArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { $ } from '../../src/runtime/var.js';
 
-const User = { id: leaf<'id', ['!'], string>('id', ['!']) };
-const Query = { posts: object('posts', ['!', 'l', '!'], User) };
+const User = { id: leafField<'id', ['!'], string>('id', ['!']) };
+const Query = { posts: objectField('posts', ['!', 'l', '!'], User) };
 const Mutation = {
-  createUser: objectArgs('createUser', ['!'], User, args<{ name: string }>({ name: 'String!' })),
+  createUser: objectFieldArgs('createUser', ['!'], User, argSpec<{ name: string }>({ name: 'String!' })),
 };
 
 it('builds a query document', () => {

@@ -10,16 +10,16 @@ const HEADER = `/* eslint-disable */
 
 /** Names the generated module always pulls from the package root. */
 const CORE_IMPORTS = [
-  'args',
+  'argSpec',
   'include',
-  'leaf',
-  'leafArgs',
+  'leafField',
+  'leafFieldArgs',
   'makeFragment',
   'makeMutation',
   'makeQuery',
   'makeSubscription',
-  'object',
-  'objectArgs',
+  'objectField',
+  'objectFieldArgs',
   'on',
   'skip',
   'spread',
@@ -101,7 +101,7 @@ function argSpec(field: IRField, ir: IRSchema): string {
   const gqlEntries = field.args.map((a) => `${a.name}: '${a.gqlType}'`).join(', ');
   const enumKeys = field.args.filter((a) => a.type.kind === 'enum').map((a) => `'${a.name}'`);
   const enumArg = enumKeys.length > 0 ? `, [${enumKeys.join(', ')}]` : '';
-  return `args<${argTsType(field, ir)}>({ ${gqlEntries} }${enumArg})`;
+  return `argSpec<${argTsType(field, ir)}>({ ${gqlEntries} }${enumArg})`;
 }
 
 function emitField(field: IRField, ir: IRSchema): string {
@@ -112,18 +112,18 @@ function emitField(field: IRField, ir: IRSchema): string {
   if (!isComposite) {
     const ts = leafTsType(field.type, ir);
     if (field.args.length === 0) {
-      return `  ${field.name}: leaf<'${field.name}', ${wrap}, ${ts}>('${field.name}', ${wrap}),`;
+      return `  ${field.name}: leafField<'${field.name}', ${wrap}, ${ts}>('${field.name}', ${wrap}),`;
     }
-    // `leafArgs` cannot infer its result type `T`, and TypeScript has no partial
+    // `leafFieldArgs` cannot infer its result type `T`, and TypeScript has no partial
     // explicit type arguments — so all four are written out.
-    return `  ${field.name}: leafArgs<'${field.name}', ${wrap}, ${ts}, ${argTsType(field, ir)}>('${field.name}', ${wrap}, ${argSpec(field, ir)}),`;
+    return `  ${field.name}: leafFieldArgs<'${field.name}', ${wrap}, ${ts}, ${argTsType(field, ir)}>('${field.name}', ${wrap}, ${argSpec(field, ir)}),`;
   }
 
   // Getters defer resolution so cyclic type references work.
   if (field.args.length === 0) {
-    return `  get ${field.name}() { return object('${field.name}', ${wrap}, ${field.type.name}) },`;
+    return `  get ${field.name}() { return objectField('${field.name}', ${wrap}, ${field.type.name}) },`;
   }
-  return `  get ${field.name}() { return objectArgs('${field.name}', ${wrap}, ${field.type.name}, ${argSpec(field, ir)}) },`;
+  return `  get ${field.name}() { return objectFieldArgs('${field.name}', ${wrap}, ${field.type.name}, ${argSpec(field, ir)}) },`;
 }
 
 function emitEnum(t: IRType): string {
@@ -157,7 +157,7 @@ function typenameTsType(t: IRType): string {
 
 function emitTypeMap(t: IRType, ir: IRSchema): string {
   const body = t.fields.map((f) => emitField(f, ir)).join('\n');
-  const typename = `  __typename: leaf<'__typename', ['!'], ${typenameTsType(t)}>('__typename', ['!']),`;
+  const typename = `  __typename: leafField<'__typename', ['!'], ${typenameTsType(t)}>('__typename', ['!']),`;
   return `export const ${t.name} = {\n${typename}\n${body}\n};\n`;
 }
 

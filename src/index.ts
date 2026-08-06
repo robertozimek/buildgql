@@ -9,7 +9,7 @@ export type {
   SubscriptionTransport,
   WsTransportOptions,
 } from './client/subscribe.js';
-export { args, leaf, leafArgs, object, objectArgs } from './runtime/builders.js';
+export { argSpec, leafField, leafFieldArgs, objectField, objectFieldArgs } from './runtime/builders.js';
 export { include, skip } from './runtime/directives.js';
 export { makeFragment, spread } from './runtime/fragment.js';
 export type { Fragment } from './runtime/fragment.js';
