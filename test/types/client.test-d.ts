@@ -1,19 +1,25 @@
-import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
+import {
+  argSpec,
+  leafField,
+  leafFieldArgs,
+  objectField,
+  objectFieldArgs,
+} from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/client.js';
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
-  lastName: leaf<'lastName', [], string>('lastName', []),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
+  lastName: leafField<'lastName', [], string>('lastName', []),
 };
-const query = makeQuery({ users: object('users', ['!', 'l', '!'], User) });
+const query = makeQuery({ users: objectField('users', ['!', 'l', '!'], User) });
 const mutation = makeMutation({
-  createUser: objectArgs(
+  createUser: objectFieldArgs(
     'createUser',
     ['!'],
     User,
-    args<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
+    argSpec<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
   ),
 });
 const client = createClient({ url: 'http://localhost/graphql' });
@@ -29,10 +35,10 @@ const q = query('Users', ($, Q) => [Q.users((U) => [U.id, U.lastName])]);
 // `keyof V extends never` version of `HasVars`, which can't distinguish `{ note?: T }`
 // from `{ note: T }`).
 const optionalOnlyQuery = makeQuery({
-  echo: leafArgs<'echo', ['!'], string, { note?: string }>(
+  echo: leafFieldArgs<'echo', ['!'], string, { note?: string }>(
     'echo',
     ['!'],
-    args<{ note?: string }>({ note: 'String' }),
+    argSpec<{ note?: string }>({ note: 'String' }),
   ),
 })('Echo', ($, Q) => [Q.echo({ note: $.note })]);
 const optionalClient = createClient({ url: 'http://localhost/graphql' });

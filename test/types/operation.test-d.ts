@@ -1,4 +1,4 @@
-import { args, leaf, object, objectArgs } from '../../src/runtime/builders.js';
+import { argSpec, leafField, objectField, objectFieldArgs } from '../../src/runtime/builders.js';
 import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
 import { $ } from '../../src/runtime/var.js';
 import type { RESULT, VARS } from '../../src/types/symbols.js';
@@ -7,22 +7,22 @@ type Expect<T extends true> = T;
 type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
-  lastName: leaf<'lastName', [], string>('lastName', []),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
+  lastName: leafField<'lastName', [], string>('lastName', []),
 };
 const Post = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  title: leaf<'title', ['!'], string>('title', ['!']),
-  author: object('author', ['!'], User),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  title: leafField<'title', ['!'], string>('title', ['!']),
+  author: objectField('author', ['!'], User),
 };
-const Query = { posts: object('posts', ['!', 'l', '!'], Post) };
+const Query = { posts: objectField('posts', ['!', 'l', '!'], Post) };
 const Mutation = {
-  createUser: objectArgs(
+  createUser: objectFieldArgs(
     'createUser',
     ['!'],
     User,
-    args<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
+    argSpec<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
   ),
 };
 

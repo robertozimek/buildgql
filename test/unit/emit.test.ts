@@ -25,20 +25,20 @@ describe('emit', () => {
 
   it('emits leaves with their wrapper tuples', async () => {
     const src = await generated();
-    expect(src).toContain("id: leaf<'id', ['!'], string>('id', ['!'])");
-    expect(src).toContain("lastName: leaf<'lastName', [], string>('lastName', [])");
+    expect(src).toContain("id: leafField<'id', ['!'], string>('id', ['!'])");
+    expect(src).toContain("lastName: leafField<'lastName', [], string>('lastName', [])");
   });
 
   it('emits object fields lazily so cyclic types resolve', async () => {
     const src = await generated();
-    expect(src).toContain("get author() { return object('author', ['!'], User) }");
+    expect(src).toContain("get author() { return objectField('author', ['!'], User) }");
   });
 
   it('emits argument specs with GraphQL type strings and optional markers', async () => {
     const src = await generated();
     // `age: Int` is nullable in the schema, so it is optional AND accepts null.
     expect(src).toContain(
-      "args<{ name: string; email: string; age?: number | null }>({ name: 'String!', email: 'String!', age: 'Int' })",
+      "argSpec<{ name: string; email: string; age?: number | null }>({ name: 'String!', email: 'String!', age: 'Int' })",
     );
   });
 
@@ -120,7 +120,7 @@ describe('emit', () => {
       ],
     };
     const src = emit(schema);
-    expect(src).toContain("args<{ status: Status }>({ status: 'Status!' }, ['status'])");
+    expect(src).toContain("argSpec<{ status: Status }>({ status: 'Status!' }, ['status'])");
   });
 
   it('falls back to `unknown` for an unmapped scalar named "valueOf", rather than splicing in the inherited Object.prototype member', () => {
@@ -157,7 +157,7 @@ describe('emit', () => {
       ],
     };
     const src = emit(schema);
-    expect(src).toContain("weird: leaf<'weird', ['!'], unknown>('weird', ['!'])");
+    expect(src).toContain("weird: leafField<'weird', ['!'], unknown>('weird', ['!'])");
   });
 
   it('types a union/interface __typename as the union of its possible types, not its own name', () => {
@@ -233,12 +233,23 @@ describe('emit', () => {
     };
     const src = emit(schema);
     // The union carries the union of its possible types...
-    expect(src).toContain("__typename: leaf<'__typename', ['!'], 'Dog' | 'Cat'>('__typename', ['!'])");
+    expect(src).toContain("__typename: leafField<'__typename', ['!'], 'Dog' | 'Cat'>('__typename', ['!'])");
     // ...an interface with no known possible types falls back to `string` rather
     // than the abstract type's own unreturnable name...
-    expect(src).toContain("__typename: leaf<'__typename', ['!'], string>('__typename', ['!'])");
+    expect(src).toContain("__typename: leafField<'__typename', ['!'], string>('__typename', ['!'])");
     // ...and a concrete object type still gets its own single literal name.
-    expect(src).toContain("__typename: leaf<'__typename', ['!'], 'Dog'>('__typename', ['!'])");
+    expect(src).toContain("__typename: leafField<'__typename', ['!'], 'Dog'>('__typename', ['!'])");
+  });
+
+  it('emits the renamed builder family', async () => {
+    const src = await generated();
+    expect(src).toContain('import {\n  argSpec,');
+    expect(src).toContain('leafField<');
+    expect(src).toContain("objectField('");
+    // The old generic names must be gone entirely.
+    expect(src).not.toMatch(/\bobject\(/);
+    expect(src).not.toMatch(/\bleaf</);
+    expect(src).not.toMatch(/\bargs</);
   });
 });
 
@@ -346,8 +357,8 @@ describe('emit — client option', () => {
     // what the emitter produced before this feature existed, and a `toContain` on a single
     // line would pass even if the sorted list were reordered around it.
     expect(src).toContain(
-      'import {\n  args,\n  createClient,\n  include,\n  leaf,\n  leafArgs,\n  makeFragment,\n' +
-        '  makeMutation,\n  makeQuery,\n  makeSubscription,\n  object,\n  objectArgs,\n  on,\n' +
+      'import {\n  argSpec,\n  createClient,\n  include,\n  leafField,\n  leafFieldArgs,\n  makeFragment,\n' +
+        '  makeMutation,\n  makeQuery,\n  makeSubscription,\n  objectField,\n  objectFieldArgs,\n  on,\n' +
         "  skip,\n  spread,\n  $,\n  v,\n} from 'buildql';\n",
     );
     expect(src).toContain('  createClient,\n');

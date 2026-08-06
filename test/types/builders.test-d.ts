@@ -1,4 +1,4 @@
-import { leaf, object, objectArgs, args } from '../../src/runtime/builders.js';
+import { leafField, objectField, objectFieldArgs, argSpec } from '../../src/runtime/builders.js';
 import { $, v } from '../../src/runtime/var.js';
 import type { Selected, VarsIn } from '../../src/types/select.js';
 import type { SelectionNode } from '../../src/types/selection.js';
@@ -9,22 +9,26 @@ type Expect<T extends true> = T;
 type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
-  lastName: leaf<'lastName', [], string>('lastName', []),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
+  lastName: leafField<'lastName', [], string>('lastName', []),
 };
 const Post = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  title: leaf<'title', ['!'], string>('title', ['!']),
-  author: object('author', ['!'], User),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  title: leafField<'title', ['!'], string>('title', ['!']),
+  author: objectField('author', ['!'], User),
 };
 const Root = {
-  posts: object('posts', ['!', 'l', '!'], Post),
-  createUser: objectArgs(
+  posts: objectField('posts', ['!', 'l', '!'], Post),
+  createUser: objectFieldArgs(
     'createUser',
     ['!'],
     User,
-    args<{ name: string; email: string; age?: number }>({ name: 'String!', email: 'String!', age: 'Int' }),
+    argSpec<{ name: string; email: string; age?: number }>({
+      name: 'String!',
+      email: 'String!',
+      age: 'Int',
+    }),
   ),
 };
 

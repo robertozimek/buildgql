@@ -5,7 +5,7 @@ import type { ArgSpec, ArgsInput, VarMarker, VarsOf } from '../types/vars.js';
 import { enumValue, isVarMarker, markerName, varRefValue } from './markers.js';
 
 /** Declares a field's argument types (compile time) and GraphQL types (runtime). */
-export function args<T>(gql: Readonly<Record<string, string>>, enums?: readonly string[]): ArgSpec<T> {
+export function argSpec<T>(gql: Readonly<Record<string, string>>, enums?: readonly string[]): ArgSpec<T> {
   return enums && enums.length > 0 ? { gql, enums } : { gql };
 }
 
@@ -39,7 +39,7 @@ function splitArgs(argv: Record<string, unknown>, spec: ArgSpec<unknown>): Split
   return { literals, varRefs };
 }
 
-function node(
+function makeFieldNode(
   name: string,
   alias: string | undefined,
   argv: Record<string, unknown> | undefined,
@@ -49,23 +49,35 @@ function node(
   return { kind: 'field', name, alias, args: argv, sels, varRefs } as AnyFieldSelection;
 }
 
+/**
+ * PHANTOM CASTS IN THIS FILE
+ *
+ * Every `as unknown as` below is a phantom-type attachment. The value produced by
+ * `makeFieldNode(...)` (or by `make(alias)`) is already the complete runtime value;
+ * the cast exists only to stamp type parameters — `N`/`AL`, `Apply<W, T>`,
+ * `VarsOf<A, Spec>`, `VarsIn<S>` — that have no runtime representation at all.
+ * None of them can be derived structurally from the runtime value.
+ */
+
 /** A scalar or enum field. `W` MUST be a `const` parameter or wrappers degrade. */
-export function leaf<N extends string, const W extends Wrap, T>(
+export function leafField<N extends string, const W extends Wrap, T>(
   name: N,
   _wrap: W,
 ): FieldSelection<N, Apply<W, T>> & { as<A extends string>(alias: A): FieldSelection<A, Apply<W, T>> } {
-  const base = node(name, undefined, undefined, undefined, []);
+  const base = makeFieldNode(name, undefined, undefined, undefined, []);
   return Object.assign(base, {
     as<A extends string>(alias: A) {
-      // Phantom attachment only: `node(...)` is the real runtime value; the cast stamps
-      // the `A`/`Apply<W, T>` type parameters, which have no runtime representation.
-      return node(name, alias, undefined, undefined, []) as unknown as FieldSelection<A, Apply<W, T>>;
+      // Phantom cast — see the file note above.
+      return makeFieldNode(name, alias, undefined, undefined, []) as unknown as FieldSelection<
+        A,
+        Apply<W, T>
+      >;
     },
   }) as FieldSelection<N, Apply<W, T>> & { as<A extends string>(alias: A): FieldSelection<A, Apply<W, T>> };
 }
 
 /** A scalar or enum field that takes arguments. */
-export function leafArgs<N extends string, const W extends Wrap, T, Spec>(
+export function leafFieldArgs<N extends string, const W extends Wrap, T, Spec>(
   name: N,
   _wrap: W,
   spec: ArgSpec<Spec>,
@@ -74,9 +86,8 @@ export function leafArgs<N extends string, const W extends Wrap, T, Spec>(
     (alias: string | undefined) =>
     <A extends ArgsInput<Spec>>(argv: A) => {
       const { literals, varRefs } = splitArgs(argv as Record<string, unknown>, spec);
-      // Phantom attachment only: `node(...)` is the real runtime value; the cast stamps
-      // `N`/`Apply<W, T>`/`VarsOf<A, Spec>`, which have no runtime representation.
-      return node(name, alias, literals, undefined, varRefs) as unknown as FieldSelection<
+      // Phantom cast — see the file note above.
+      return makeFieldNode(name, alias, literals, undefined, varRefs) as unknown as FieldSelection<
         N,
         Apply<W, T>,
         VarsOf<A, Spec>
@@ -84,8 +95,7 @@ export function leafArgs<N extends string, const W extends Wrap, T, Spec>(
     };
   return Object.assign(make(undefined), {
     as<AL extends string>(alias: AL) {
-      // Phantom attachment only: `make(alias)` is the real runtime function; the cast
-      // renames its type parameter from `N` to `AL` to match the aliased field name.
+      // Phantom cast — see the file note above.
       return make(alias) as unknown as <A extends ArgsInput<Spec>>(
         argv: A,
       ) => FieldSelection<AL, Apply<W, T>, VarsOf<A, Spec>>;
@@ -94,14 +104,13 @@ export function leafArgs<N extends string, const W extends Wrap, T, Spec>(
 }
 
 /** An object/interface/union field. `F` is the child field map from codegen. */
-export function object<N extends string, const W extends Wrap, F>(name: N, _wrap: W, fields: F) {
+export function objectField<N extends string, const W extends Wrap, F>(name: N, _wrap: W, fields: F) {
   const make =
     (alias: string | undefined) =>
     <S extends readonly SelectionNode[]>(pick: (f: F) => readonly [...S]) => {
       const sels = pick(fields);
-      // Phantom attachment only: `node(...)` is the real runtime value; the cast stamps
-      // `N`/`Apply<W, Selected<S>>`/`VarsIn<S>`, which have no runtime representation.
-      return node(name, alias, undefined, sels, []) as unknown as FieldSelection<
+      // Phantom cast — see the file note above.
+      return makeFieldNode(name, alias, undefined, sels, []) as unknown as FieldSelection<
         N,
         Apply<W, Selected<S>>,
         VarsIn<S>
@@ -109,8 +118,7 @@ export function object<N extends string, const W extends Wrap, F>(name: N, _wrap
     };
   return Object.assign(make(undefined), {
     as<AL extends string>(alias: AL) {
-      // Phantom attachment only: `make(alias)` is the real runtime function; the cast
-      // renames its type parameter from `N` to `AL` to match the aliased field name.
+      // Phantom cast — see the file note above.
       return make(alias) as unknown as <S extends readonly SelectionNode[]>(
         pick: (f: F) => readonly [...S],
       ) => FieldSelection<AL, Apply<W, Selected<S>>, VarsIn<S>>;
@@ -119,7 +127,7 @@ export function object<N extends string, const W extends Wrap, F>(name: N, _wrap
 }
 
 /** An object field that takes arguments. */
-export function objectArgs<N extends string, const W extends Wrap, F, Spec>(
+export function objectFieldArgs<N extends string, const W extends Wrap, F, Spec>(
   name: N,
   _wrap: W,
   fields: F,
@@ -133,9 +141,8 @@ export function objectArgs<N extends string, const W extends Wrap, F, Spec>(
     ) => {
       const { literals, varRefs } = splitArgs(argv as Record<string, unknown>, spec);
       const sels = pick(fields);
-      // Phantom attachment only: `node(...)` is the real runtime value; the cast stamps
-      // `N`/`Apply<W, Selected<S>>`/`VarsIn<S> & VarsOf<A, Spec>`, which have no runtime representation.
-      return node(name, alias, literals, sels, varRefs) as unknown as FieldSelection<
+      // Phantom cast — see the file note above.
+      return makeFieldNode(name, alias, literals, sels, varRefs) as unknown as FieldSelection<
         N,
         Apply<W, Selected<S>>,
         VarsIn<S> & VarsOf<A, Spec>
@@ -143,8 +150,7 @@ export function objectArgs<N extends string, const W extends Wrap, F, Spec>(
     };
   return Object.assign(make(undefined), {
     as<AL extends string>(alias: AL) {
-      // Phantom attachment only: `make(alias)` is the real runtime function; the cast
-      // renames its type parameter from `N` to `AL` to match the aliased field name.
+      // Phantom cast — see the file note above.
       return make(alias) as unknown as <A extends ArgsInput<Spec>, S extends readonly SelectionNode[]>(
         argv: A,
         pick: (f: F) => readonly [...S],

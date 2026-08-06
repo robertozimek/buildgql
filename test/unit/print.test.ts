@@ -1,26 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { args, leaf, leafArgs, object, objectArgs } from '../../src/runtime/builders.js';
+import {
+  argSpec,
+  leafField,
+  leafFieldArgs,
+  objectField,
+  objectFieldArgs,
+} from '../../src/runtime/builders.js';
 import { $, v } from '../../src/runtime/var.js';
 import { printOperation } from '../../src/runtime/print.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
-  lastName: leaf<'lastName', [], string>('lastName', []),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
+  lastName: leafField<'lastName', [], string>('lastName', []),
 };
 const Post = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  title: leaf<'title', ['!'], string>('title', ['!']),
-  author: object('author', ['!'], User),
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  title: leafField<'title', ['!'], string>('title', ['!']),
+  author: objectField('author', ['!'], User),
 };
 const Root = {
-  posts: object('posts', ['!', 'l', '!'], Post),
-  createUser: objectArgs(
+  posts: objectField('posts', ['!', 'l', '!'], Post),
+  createUser: objectFieldArgs(
     'createUser',
     ['!'],
     User,
-    args<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
+    argSpec<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
   ),
 };
 
@@ -70,8 +76,8 @@ describe('printOperation', () => {
 
   it('rejects a variable name used with two different types', () => {
     const Mixed = {
-      a: objectArgs('a', ['!'], User, args<{ x: string }>({ x: 'String!' })),
-      b: objectArgs('b', ['!'], User, args<{ x: number }>({ x: 'Int!' })),
+      a: objectFieldArgs('a', ['!'], User, argSpec<{ x: string }>({ x: 'String!' })),
+      b: objectFieldArgs('b', ['!'], User, argSpec<{ x: number }>({ x: 'Int!' })),
     };
     expect(() =>
       printOperation('query', 'Bad', [
@@ -83,7 +89,12 @@ describe('printOperation', () => {
 
   it('serialises object and list literals', () => {
     const F = {
-      f: objectArgs('f', ['!'], User, args<{ where: { ids: string[]; ok: boolean } }>({ where: 'Filter!' })),
+      f: objectFieldArgs(
+        'f',
+        ['!'],
+        User,
+        argSpec<{ where: { ids: string[]; ok: boolean } }>({ where: 'Filter!' }),
+      ),
     };
     const doc = printOperation('query', 'Q', [F.f({ where: { ids: ['a', 'b'], ok: true } }, (U) => [U.id])]);
     expect(doc).toBe('query Q { f(where: {ids: ["a", "b"], ok: true}) { id } }');
@@ -91,11 +102,11 @@ describe('printOperation', () => {
 
   it('prints enum literals unquoted and strings quoted', () => {
     const F = {
-      f: objectArgs(
+      f: objectFieldArgs(
         'f',
         ['!'],
         User,
-        args<{ status: 'ACTIVE' | 'BANNED'; name: string }>({ status: 'Status!', name: 'String!' }, [
+        argSpec<{ status: 'ACTIVE' | 'BANNED'; name: string }>({ status: 'Status!', name: 'String!' }, [
           'status',
         ]),
       ),
@@ -106,10 +117,10 @@ describe('printOperation', () => {
 
   it('does not mistake a user input object with a __enum key for an enum value', () => {
     const Root = {
-      search: leafArgs<'search', ['!'], string, { filter: { __enum: string } }>(
+      search: leafFieldArgs<'search', ['!'], string, { filter: { __enum: string } }>(
         'search',
         ['!'],
-        args<{ filter: { __enum: string } }>({ filter: 'FilterInput!' }),
+        argSpec<{ filter: { __enum: string } }>({ filter: 'FilterInput!' }),
       ),
     };
     const q = makeQuery(Root)('Search', (_$, R) => [R.search({ filter: { __enum: 'NOT_AN_ENUM' } })]);
@@ -119,10 +130,10 @@ describe('printOperation', () => {
 
   it('does not mistake a user input object with a __varRef key for a variable', () => {
     const Root = {
-      search: leafArgs<'search', ['!'], string, { filter: { __varRef: string } }>(
+      search: leafFieldArgs<'search', ['!'], string, { filter: { __varRef: string } }>(
         'search',
         ['!'],
-        args<{ filter: { __varRef: string } }>({ filter: 'FilterInput!' }),
+        argSpec<{ filter: { __varRef: string } }>({ filter: 'FilterInput!' }),
       ),
     };
     const q = makeQuery(Root)('Search', (_$, R) => [R.search({ filter: { __varRef: 'nope' } })]);

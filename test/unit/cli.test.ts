@@ -44,7 +44,7 @@ it('applies scalar overrides from config', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
   await copyFile(sdlPath, join(dir, 'schema.graphql'));
   const out = await generate({ schema: './schema.graphql', scalars: { ID: 'MyId' } }, dir);
-  expect(await readFile(out, 'utf8')).toContain("leaf<'id', ['!'], MyId>");
+  expect(await readFile(out, 'utf8')).toContain("leafField<'id', ['!'], MyId>");
 });
 
 it('warns by name about a custom scalar with no entry in "scalars"', async () => {

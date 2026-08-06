@@ -2,12 +2,12 @@ import { writeFile } from 'node:fs/promises';
 
 const NT = 60;
 const NF = 30;
-const lines = [`import { leaf, object, makeQuery } from '../../src/index.js';`];
+const lines = [`import { leafField, objectField, makeQuery } from '../../src/index.js';`];
 
 for (let t = 0; t < NT; t++) {
   const fs = [];
-  for (let i = 0; i < NF; i++) fs.push(`  f${i}: leaf<'f${i}', ['!'], string>('f${i}', ['!']),`);
-  if (t > 0) fs.push(`  get child() { return object('child', ['!'], T${t - 1}); },`);
+  for (let i = 0; i < NF; i++) fs.push(`  f${i}: leafField<'f${i}', ['!'], string>('f${i}', ['!']),`);
+  if (t > 0) fs.push(`  get child() { return objectField('child', ['!'], T${t - 1}); },`);
   lines.push(`export const T${t} = {\n${fs.join('\n')}\n};`);
 }
 

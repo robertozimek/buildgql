@@ -1,19 +1,19 @@
 import { expect, it } from 'vitest';
-import { args, leaf, leafArgs, object } from '../../src/runtime/builders.js';
+import { argSpec, leafField, leafFieldArgs, objectField } from '../../src/runtime/builders.js';
 import { makeFragment, spread } from '../../src/runtime/fragment.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 import { $ } from '../../src/runtime/var.js';
 
 const User = {
-  id: leaf<'id', ['!'], string>('id', ['!']),
-  firstName: leaf<'firstName', ['!'], string>('firstName', ['!']),
-  avatar: leafArgs<'avatar', ['!'], string, { size: number }>(
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
+  avatar: leafFieldArgs<'avatar', ['!'], string, { size: number }>(
     'avatar',
     ['!'],
-    args<{ size: number }>({ size: 'Int!' }),
+    argSpec<{ size: number }>({ size: 'Int!' }),
   ),
 };
-const Query = { users: object('users', ['!', 'l', '!'], User) };
+const Query = { users: objectField('users', ['!', 'l', '!'], User) };
 const userFragment = makeFragment('User', User);
 const query = makeQuery(Query);
 
