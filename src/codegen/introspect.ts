@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import type * as GraphqlModule from 'graphql';
 
 export interface IntrospectionTypeRef {
   readonly kind: string;
@@ -115,7 +116,7 @@ async function introspectUrl(url: string, opts: LoadOptions): Promise<Introspect
 }
 
 async function introspectSdl(source: string): Promise<IntrospectionResult> {
-  let gql: typeof import('graphql');
+  let gql: typeof GraphqlModule;
   try {
     gql = await import('graphql');
   } catch {

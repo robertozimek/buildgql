@@ -66,7 +66,7 @@ export async function main(argv: string[]): Promise<number> {
   }
 
   const flagIndex = argv.indexOf('--config');
-  const cwd = flagIndex !== -1 && argv[flagIndex + 1] ? resolve(argv[flagIndex + 1]!) : process.cwd();
+  const cwd = flagIndex !== -1 && argv[flagIndex + 1] ? resolve(argv[flagIndex + 1]) : process.cwd();
 
   try {
     const { config, path } = await loadConfig(cwd);
@@ -116,7 +116,7 @@ export function isEntrypoint(moduleUrl: string, argv1: string | undefined): bool
 
 // Only run when invoked as the binary, not when imported by tests.
 if (isEntrypoint(import.meta.url, process.argv[1])) {
-  main(process.argv.slice(2)).then((code) => {
+  void main(process.argv.slice(2)).then((code) => {
     process.exitCode = code;
   });
 }

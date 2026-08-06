@@ -147,7 +147,7 @@ describe('client registry', () => {
       // unchanged.
       const adapterName = typesKey.split('/').pop()!;
       const modUrl = new URL(`../../src/adapters/${adapterName}.js`, import.meta.url).href;
-      const mod = await import(modUrl);
+      const mod = (await import(modUrl)) as Record<string, unknown>;
       expect(Object.keys(mod).sort()).toEqual([...names].sort());
     }
   });

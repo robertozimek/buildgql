@@ -144,7 +144,7 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
         if (msg.type === 'connection_ack') {
           socket.send(JSON.stringify({ id, type: 'subscribe', payload }));
         } else if (msg.type === 'next' && msg.payload) {
-          queue.push(msg.payload as StreamChunk);
+          queue.push(msg.payload);
           notify();
         } else if (msg.type === 'error') {
           // graphql-ws defines `payload` on an `error` message as `GraphQLFormattedError[]`
