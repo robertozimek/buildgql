@@ -2470,12 +2470,166 @@ git commit -m "test: pin the public API surface and document conventions"
 
 ---
 
+### Task 14: Fix the list-type precedence bug in `inputTsType`
+
+Added after the plan was approved, from a question about how `scalars` handles complex types. The `scalars` config value is a TypeScript type *expression* spliced raw into generated source, so `{ Point: '{ x: number; y: number }' }` and `{ JSON: 'Record<string, unknown>' }` both work. But `inputTsType` builds list types by string concatenation without parenthesising, so a scalar mapped to a **union** produces the wrong type in list input positions.
+
+Reproduced against the current emitter with `{ JSON: 'string | number' }` and a `[JSON!]` argument:
+
+```
+tags?: string | number[] | null
+```
+
+TypeScript parses that as `string | (number[]) | null`. The correct type is `(string | number)[] | null`. The emitted type silently accepts a bare `string` where a list is required, and rejects `['a', 1]` — the very value the schema demands. It affects field arguments and input-object fields alike, since `emitInput` uses the same function.
+
+Output positions are unaffected: `Apply<W, T>` in `src/types/wrap.ts` is a type-level operation over an already-parsed type, not string concatenation.
+
+Note the nullable-element branch already parenthesises (`(${out} | null)[]`); only the non-null branch forgot.
+
+**Runs after Task 11**, which moves this function from `src/codegen/emit.ts` to `src/codegen/ts-types.ts`. If Task 11 has not run, apply the change in `emit.ts` instead — the function body is identical.
+
+**Files:**
+- Modify: `src/codegen/ts-types.ts` (`inputTsType`; `emit.ts` if Task 11 has not run)
+- Test: `test/unit/ts-types.test.ts` (create)
+
+**Interfaces:**
+- Consumes: Task 11's `src/codegen/ts-types.ts` exporting `inputTsType(ref: IRTypeRef, ir: IRSchema): string`
+- Produces: no signature change. `inputTsType` gains a module-private helper `isAtomicTypeExpression(type: string): boolean`.
+
+- [ ] **Step 1: Write the failing test**
+
+Create `test/unit/ts-types.test.ts`. These call `inputTsType` directly rather than going through the emitter — the defect is in one pure string function, and a direct test names it precisely.
+
+```ts
+import { expect, it } from 'vitest';
+import { inputTsType } from '../../src/codegen/ts-types.js';
+import type { IRSchema, IRTypeRef } from '../../src/codegen/ir.js';
+
+/** A minimal IRSchema carrying only the scalar map `inputTsType` reads. */
+function schemaWithScalars(scalars: Record<string, string>): IRSchema {
+  return {
+    queryType: 'Query',
+    mutationType: null,
+    subscriptionType: null,
+    types: [],
+    scalars: { ID: 'string', String: 'string', Int: 'number', Float: 'number', Boolean: 'boolean', ...scalars },
+  };
+}
+
+/** `[JSON!]` — a nullable list of non-null JSON. `flatten` records it outer-to-inner. */
+const listOfNonNull: IRTypeRef = { wrap: ['l', '!'], name: 'JSON', kind: 'scalar' };
+
+it('parenthesises a union-typed scalar inside a list', () => {
+  const ir = schemaWithScalars({ JSON: 'string | number' });
+  // Without parens this is `string | number[] | null`, which TypeScript reads as
+  // `string | (number[]) | null` — it accepts a bare string and rejects ['a', 1].
+  expect(inputTsType(listOfNonNull, ir)).toBe('(string | number)[] | null');
+});
+
+it('parenthesises a function-typed scalar inside a list', () => {
+  const ir = schemaWithScalars({ JSON: '(a: string) => void' });
+  expect(inputTsType(listOfNonNull, ir)).toBe('((a: string) => void)[] | null');
+});
+
+it('leaves an identifier, a generic and an object literal unparenthesised', () => {
+  // Pins the common case against cosmetic churn: these already bind tighter than `[]`.
+  expect(inputTsType(listOfNonNull, schemaWithScalars({ JSON: 'string' }))).toBe('string[] | null');
+  expect(inputTsType(listOfNonNull, schemaWithScalars({ JSON: 'Record<string, unknown>' }))).toBe(
+    'Record<string, unknown>[] | null',
+  );
+  expect(inputTsType(listOfNonNull, schemaWithScalars({ JSON: '{ x: number; y: number }' }))).toBe(
+    '{ x: number; y: number }[] | null',
+  );
+});
+
+it('still nests lists correctly once the base is parenthesised', () => {
+  const ir = schemaWithScalars({ JSON: 'string | number' });
+  // `[[JSON!]!]` — a nullable list of non-null lists of non-null JSON.
+  const nested: IRTypeRef = { wrap: ['l', '!', 'l', '!'], name: 'JSON', kind: 'scalar' };
+  expect(inputTsType(nested, ir)).toBe('(string | number)[][] | null');
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `npx vitest run test/unit/ts-types.test.ts`
+Expected: FAIL — the first test reports `string | number[] | null`, the second `(a: string) => void[] | null`. The third and fourth should already pass; if the third fails, the fix in Step 3 has introduced cosmetic churn and existing emitter snapshots will break too.
+
+- [ ] **Step 3: Parenthesise the base when it does not bind tightly enough**
+
+In `src/codegen/ts-types.ts`, add the helper above `inputTsType` and use it for the base:
+
+```ts
+/**
+ * True when `type` binds tighter than a postfix `[]`, so `${type}[]` means what it looks
+ * like. Identifiers, dotted qualified names, generic instantiations and object-literal
+ * types all qualify.
+ *
+ * A union does not: `string | number` + `[]` parses as `string | (number[])`, a different
+ * and wrong type. Neither does a function type. Scalar mappings come from user config as
+ * raw TypeScript source (`scalars: { JSON: 'string | number' }`), so either can arrive here.
+ */
+function isAtomicTypeExpression(type: string): boolean {
+  const named = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*(<.*>)?$/;
+  const objectLiteral = /^\{.*\}$/;
+  return named.test(type) || objectLiteral.test(type);
+}
+```
+
+Then, in `inputTsType`, wrap the base once before the wrapper walk:
+
+```ts
+export function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
+  const base = ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
+  // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
+  // Only the base needs the atomicity guard: every later iteration appends to a
+  // string already ending in `[]`, which binds tightly on its own.
+  let out = isAtomicTypeExpression(base) ? base : `(${base})`;
+  const toks = [...ref.wrap].reverse();
+  let nonNull = false;
+  for (const tok of toks) {
+    if (tok === '!') {
+      nonNull = true;
+    } else {
+      out = nonNull ? `${out}[]` : `(${out} | null)[]`;
+      nonNull = false;
+    }
+  }
+  return nonNull ? out : `${out} | null`;
+}
+```
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `npx vitest run test/unit/ts-types.test.ts`
+Expected: PASS (4 tests)
+
+- [ ] **Step 5: Confirm no generated-output churn**
+
+The third test pins that simple mappings are untouched, but the emitter's own tests are the real check that no existing output changed shape.
+
+Run: `npx vitest run test/unit/emit.test.ts test/e2e/generate-and-run.test.ts`
+Expected: PASS with no assertion changes needed. If an emitter assertion now needs editing, the guard is too aggressive — narrow `isAtomicTypeExpression` rather than editing the expectation.
+
+- [ ] **Step 6: Verify and commit**
+
+Run: `npm run check`
+Expected: PASS
+
+```bash
+git add src/codegen/ts-types.ts test/unit/ts-types.test.ts
+git commit -m "fix(codegen): parenthesise union-typed scalars in list input positions"
+```
+
+---
+
 ## Execution Notes
 
-**Task order matters in two places:**
+**Task order matters in three places:**
 
 - Task 9 (transport split) creates `src/client/transport.ts`, which Task 8 imports. Run 8 → 9 in order and fix the two import paths as Step 8 of Task 9 says, or run 9 before 8.
 - Task 11 moves `unmappedScalars`, which Task 12's `generate.ts` imports. Run 11 before 12.
+- Task 14 edits `inputTsType` in the file Task 11 creates. Run 11 before 14, or apply Task 14's change in `emit.ts` instead.
 
 Everything else is independent.
 
