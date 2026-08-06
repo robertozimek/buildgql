@@ -113,7 +113,7 @@ export async function loadConfig(
   // config" fallthrough for real requires an actual Node import to reject with a
   // native `SyntaxError`/`ERR_UNKNOWN_FILE_EXTENSION`, which a TypeScript-aware test
   // runner's own transform (unlike plain Node) won't reproduce. Production code never
-  // passes this — `cli/index.ts` calls `loadConfig(cwd)` — so real dynamic `import()`
+  // passes this — `cli/main.ts` calls `loadConfig(cwd)` — so real dynamic `import()`
   // is always what actually resolves a config file outside of tests.
   importModule: ConfigImporter = defaultImporter,
 ): Promise<{ config: BuildQLConfig; path: string }> {

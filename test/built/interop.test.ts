@@ -1,9 +1,15 @@
+import { execFile } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+
+// Named distinctly from `withConfigDir`'s own `run` parameter below, so neither shadows
+// the other.
+const execFileAsync = promisify(execFile);
 
 /**
  * The only suite in this repo that asserts on BUILT output rather than on `src/`.
@@ -48,7 +54,7 @@ const REQUIRED = [
   'client/index.js',
   'cli/config.cjs',
   'cli/config.js',
-  'cli/index.js',
+  'cli/bin.js',
   'adapters/apollo.cjs',
   'adapters/apollo.js',
   'adapters/urql.cjs',
@@ -162,16 +168,26 @@ describe('published entry points', () => {
     }
   });
 
-  it('loads every ESM bundle named in exports.import, plus the bin', async () => {
+  it('loads every ESM bundle named in exports.import', async () => {
     const entries = exportsUnder('import');
     expect(entries.length).toBe(Object.keys(pkg.exports).length);
-    // `bin` has no `exports` entry, so it would otherwise never be loaded. Importing it is
-    // safe: its main block is behind `isEntrypoint(import.meta.url, process.argv[1])`, and
-    // under vitest `argv[1]` is vitest's own binary — so the guard is false and nothing runs.
-    for (const [sub, abs] of [...entries, ['bin', fileURLToPath(new URL(pkg.bin.buildql, repoRoot))]]) {
-      const mod = (await import(pathToFileURL(abs!).href)) as Record<string, unknown>;
+    for (const [sub, abs] of entries) {
+      const mod = (await import(pathToFileURL(abs).href)) as Record<string, unknown>;
       expect(Object.keys(mod).length, `${sub} loaded but exported nothing`).toBeGreaterThan(0);
     }
+  });
+
+  // `bin` has no `exports` entry and — unlike the old `cli/index.js`, whose main block sat
+  // behind an `isEntrypoint(import.meta.url, process.argv[1])` guard — `dist/cli/bin.js` now
+  // calls `main()` unconditionally on load. Importing it in-process here would run `main()`
+  // against THIS test process's own argv and set `process.exitCode` on the test runner
+  // itself, corrupting the very run that's meant to verify it. So it is spawned as a real
+  // child process instead, which is also a strictly stronger check: it proves the shebang
+  // line works, not just that the module graph resolves.
+  it('runs as a real child process and prints usage on --help', async () => {
+    const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
+    const { stdout } = await execFileAsync(process.execPath, [bin, '--help']);
+    expect(stdout).toContain('type-safe GraphQL query builder codegen');
   });
 });
 
