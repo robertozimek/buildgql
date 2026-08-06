@@ -19,12 +19,29 @@ export function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
   return scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR;
 }
 
+/**
+ * True when `type` binds tighter than a postfix `[]`, so `${type}[]` means what it looks
+ * like. Identifiers, dotted qualified names, generic instantiations and object-literal
+ * types all qualify.
+ *
+ * A union does not: `string | number` + `[]` parses as `string | (number[])`, a different
+ * and wrong type. Neither does a function type. Scalar mappings come from user config as
+ * raw TypeScript source (`scalars: { JSON: 'string | number' }`), so either can arrive here.
+ */
+function isAtomicTypeExpression(type: string): boolean {
+  const named = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*(<.*>)?$/;
+  const objectLiteral = /^\{.*\}$/;
+  return named.test(type) || objectLiteral.test(type);
+}
+
 /** The TypeScript type of an *input* position, wrappers included. */
 export function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
   const base =
     ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
-  let out = base;
+  // Only the base needs the atomicity guard: every later iteration appends to a
+  // string already ending in `[]`, which binds tightly on its own.
+  let out = isAtomicTypeExpression(base) ? base : `(${base})`;
   const toks = [...ref.wrap].reverse();
   let nonNull = false;
   for (const tok of toks) {
