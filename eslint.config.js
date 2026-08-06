@@ -32,7 +32,10 @@ export default tseslint.config(
       '@typescript-eslint/naming-convention': [
         'error',
         { selector: 'typeLike', format: ['PascalCase'] },
-        { selector: 'interface', format: ['PascalCase'], custom: { regex: '^I[A-Z]', match: false } },
+        // Third character required lowercase so this catches Hungarian `IUserService`
+        // (`I`,`U`,`s`) without also catching a domain prefix like `IRSchema`
+        // (`I`,`R`,`S` — third character is uppercase, so it's spared).
+        { selector: 'interface', format: ['PascalCase'], custom: { regex: '^I[A-Z][a-z]', match: false } },
         { selector: 'function', format: ['camelCase'] },
         {
           selector: 'variable',
@@ -75,15 +78,6 @@ export default tseslint.config(
     // client, codegen or adapters still gets reported.
     files: ['src/runtime/**/*.ts'],
     rules: { '@typescript-eslint/no-unnecessary-type-assertion': 'off' },
-  },
-  {
-    // `IR` here is a domain prefix — Intermediate Representation — not Hungarian-notation
-    // `I`-prefixing; the interface regex above can't tell them apart. IRSchema, IRType,
-    // IRField, IRArg and IRTypeRef are load-bearing names used throughout src/codegen
-    // (and by later refactor tasks), so the fix is scoping the check off here rather
-    // than renaming.
-    files: ['src/codegen/ir.ts'],
-    rules: { '@typescript-eslint/naming-convention': 'off' },
   },
   {
     files: ['test/**/*.ts'],
