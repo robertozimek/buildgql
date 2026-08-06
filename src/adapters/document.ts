@@ -22,6 +22,13 @@ export interface TypedDocumentNode<R, V> extends DocumentNode {
  * document caches (and, for Apollo, its query manager) on AST identity, so handing them a
  * freshly parsed node on every call would defeat caching and re-trigger network requests
  * on every render. A `WeakMap` keeps this from pinning operations that go out of scope.
+ *
+ * Only per-adapter identity is a contract (each of `apolloDocument`/`urqlDocument` returns
+ * the same node across calls for the same operation) — tsup code-splits the ESM build so
+ * both adapters share one `WeakMap` via a common chunk, but not the CJS build, where
+ * `dist/adapters/apollo.cjs` and `dist/adapters/urql.cjs` each get their own module instance
+ * and therefore their own cache. `apolloDocument(op) !== urqlDocument(op)` under `require`
+ * as a result; do not rely on cross-adapter document identity.
  */
 const cache = new WeakMap<Operation<unknown, unknown>, DocumentNode>();
 
