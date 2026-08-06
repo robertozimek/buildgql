@@ -13,5 +13,8 @@
     "types": ["node"]
   },
   "include": ["src", "test"],
-  "exclude": ["test/perf"]
+  // `test/types/nuia` compiles only under its own tsconfig, which turns on
+  // `noUncheckedIndexedAccess`. Including it here (the repo default, flag off)
+  // makes editors report a spurious "unused @ts-expect-error" (TS2578).
+  "exclude": ["test/perf", "test/types/nuia"]
 }
