@@ -30,11 +30,11 @@ export function spread<R, V>(f: Fragment<R, V>): FragmentSpread<R, V> {
 
 /**
  * Walks a selection tree collecting every reachable fragment, deduped by name.
- * Two different fragment handles sharing a name is a conflict — printing would
+ * Two different fragments sharing a name is a conflict — printing would
  * silently keep whichever one was discovered first while the *other* call site's
  * inferred result type kept describing the fields it actually picked, producing a
- * type that lies about what the server returns. Reusing the very same handle in two
- * places is fine and must not throw, so handles are compared by identity, not name
+ * type that lies about what the server returns. Reusing the very same fragment in two
+ * places is fine and must not throw, so fragments are compared by identity, not name
  * alone (mirrors `dedupeVarRefs` in `print.ts`, which does the same for variables).
  */
 export function collectFragments(sels: readonly SelectionNode[]): FragmentDefinition[] {
