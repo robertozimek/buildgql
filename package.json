@@ -69,14 +69,14 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:types": "tsc -p tsconfig.typetest.json && tsc -p test/types/nuia/tsconfig.json",
     "test:perf": "node scripts/typeperf.mjs",
-    "check": "npm run lint && npm run format:check && npm run test:types && npm run test && npm run test:perf"
+    "check": "npm run lint && npm run format:check && npm run test:types && npm run build && npm run test && npm run test:perf"
   },
   "peerDependencies": {
     "graphql": ">=16",
