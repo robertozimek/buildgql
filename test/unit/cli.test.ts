@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { mkdtemp, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, copyFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { generate, main } from '../../src/cli/index.js';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { generate, isEntrypoint, main } from '../../src/cli/index.js';
 
 const sdlPath = fileURLToPath(new URL('../fixtures/schema.graphql', import.meta.url));
 
@@ -136,4 +136,44 @@ it('says nothing about adapters for the default client', async () => {
   await copyFile(sdlPath, join(dir, 'schema.graphql'));
   await generate({ schema: './schema.graphql', output: '.' }, dir);
   expect(written(stdoutSpy)).not.toContain('buildql/adapters');
+});
+
+// The CLI only calls `main()` when it decides it was invoked as the binary rather than
+// imported. Getting that decision wrong is silent: the process exits 0 having done
+// nothing, which looks exactly like a successful `buildql generate`.
+it('recognises a SYMLINKED entrypoint as the entrypoint', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-entry-'));
+  const real = join(dir, 'real-cli.js');
+  await writeFile(real, '// stands in for dist/cli/index.js\n');
+  const link = join(dir, 'linked-cli.js');
+  await symlink(real, link);
+
+  // Node resolves `import.meta.url` to the file's REALPATH, while `process.argv[1]`
+  // keeps whatever path the caller typed. pnpm (by default), npm workspaces and
+  // `npm link` all install `node_modules/buildql` as a symlink, so comparing the two
+  // raw strings is false for every one of those users — the exact condition that made
+  // `buildql generate` a silent no-op under pnpm.
+  expect(isEntrypoint(pathToFileURL(real).href, link)).toBe(true);
+});
+
+it('recognises a plain, unsymlinked entrypoint', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-entry-'));
+  const real = join(dir, 'cli.js');
+  await writeFile(real, '// cli\n');
+  expect(isEntrypoint(pathToFileURL(real).href, real)).toBe(true);
+});
+
+it('rejects an unrelated entrypoint, so importing the module does not run it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-entry-'));
+  const a = join(dir, 'cli.js');
+  const b = join(dir, 'some-test-runner.js');
+  await writeFile(a, '// cli\n');
+  await writeFile(b, '// runner\n');
+  expect(isEntrypoint(pathToFileURL(a).href, b)).toBe(false);
+});
+
+it('rejects a missing argv[1] rather than throwing', () => {
+  expect(isEntrypoint('file:///anything.js', undefined)).toBe(false);
+  // A path that does not exist must not blow up `realpathSync` on the way through.
+  expect(isEntrypoint('file:///anything.js', '/no/such/file.js')).toBe(false);
 });
