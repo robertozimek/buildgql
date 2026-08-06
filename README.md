@@ -11,11 +11,11 @@ import { query, mutation, $, createClient } from './src/gql';
 
 const client = createClient({ url: 'https://api.example.com/graphql' });
 
-const Posts = query('Posts', ($, Q) => [
-  Q.posts((P) => [
-    P.id,
-    P.title,
-    P.author((A) => [A.id, A.firstName, A.lastName]),
+const Posts = query('Posts', ($, q) => [
+  q.posts((post) => [
+    post.id,
+    post.title,
+    post.author((author) => [author.id, author.firstName, author.lastName]),
   ]),
 ]);
 
@@ -26,8 +26,8 @@ const result = await client.execute(Posts);
 Mutations infer their variables from where you used `$`:
 
 ```ts
-const CreateNewUser = mutation('CreateNewUser', ($, M) => [
-  M.createUser({ name: $.name, email: $.email }, (U) => [U.id, U.firstName]),
+const CreateNewUser = mutation('CreateNewUser', ($, m) => [
+  m.createUser({ name: $.name, email: $.email }, (user) => [user.id, user.firstName]),
 ]);
 
 await client.execute(CreateNewUser, { name: 'John Smith', email: 'john@smith.com' });
@@ -86,7 +86,7 @@ npx buildql generate
 argument** and typed from the schema:
 
 ```ts
-M.createUser({ name: $.name }, (U) => [U.id]);
+m.createUser({ name: $.name }, (user) => [user.id]);
 // -> mutation ($name: String!) { createUser(name: $name) { id } }
 ```
 
@@ -95,7 +95,7 @@ Name one explicitly with `v()`:
 
 ```ts
 import { v } from './src/gql';
-Q.post({ id: v('postId') }, (P) => [P.title]);
+q.post({ id: v('postId') }, (post) => [post.title]);
 ```
 
 Optional schema arguments produce optional variables — TypeScript handles the rest.
@@ -112,15 +112,15 @@ variable transport encodes enums correctly regardless of nesting.
 ```ts
 import { on, spread, include, v, userFragment } from './src/gql';
 
-const NameBits = userFragment('NameBits', (U) => [U.firstName, U.lastName]);
+const NameBits = userFragment('NameBits', (user) => [user.firstName, user.lastName]);
 
-query('Feed', ($, Q) => [
-  Q.users((U) => [U.id, spread(NameBits)]),
-  Q.pet((P) => [
-    on('Dog', Dog, (D) => [D.breed]),
-    on('Cat', Cat, (C) => [C.lives]),
+query('Feed', ($, q) => [
+  q.users((user) => [user.id, spread(NameBits)]),
+  q.pet((pet) => [
+    on('Dog', Dog, (dog) => [dog.breed]),
+    on('Cat', Cat, (cat) => [cat.lives]),
   ]),
-  Q.me((M) => [include(M.email, v('withEmail'))]),
+  q.me((me) => [include(me.email, v('withEmail'))]),
 ]);
 ```
 
@@ -173,8 +173,12 @@ export default defineConfig({
 import { query, mutation, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
 import { useQuery } from '@apollo/client';
 
-const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
-const CreateUser = mutation('CreateUser', ($, M) => [M.createUser({ name: $.name }, (U) => [U.id])]);
+const UserById = query('UserById', ($, q) => [
+  q.user({ id: $.id }, (user) => [user.id, user.firstName]),
+]);
+const CreateUser = mutation('CreateUser', ($, m) => [
+  m.createUser({ name: $.name }, (user) => [user.id]),
+]);
 
 // Imperative API — the adapter returns Apollo's options object verbatim.
 const { data } = await apolloClient.query(toApolloQuery(UserById, { id: '7' }));
@@ -196,8 +200,12 @@ take the same `{ query, variables }` shape. Passing a mutation to `toApolloQuery
 import { query, mutation, toUrqlArgs, urqlDocument } from './src/gql';
 import { useQuery, useMutation } from 'urql';
 
-const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
-const CreateUser = mutation('CreateUser', ($, M) => [M.createUser({ name: $.name }, (U) => [U.id])]);
+const UserById = query('UserById', ($, q) => [
+  q.user({ id: $.id }, (user) => [user.id, user.firstName]),
+]);
+const CreateUser = mutation('CreateUser', ($, m) => [
+  m.createUser({ name: $.name }, (user) => [user.id]),
+]);
 
 // urql's useQuery/useSubscription take { query, variables }; useMutation and the
 // positional client methods take the document on its own — use urqlDocument for those.
