@@ -15,3 +15,6 @@ export type UnionToIntersection<U> = [U] extends [never]
 
 /** Strips `null` from a union. Distributes, so `NonNull<A | null>` is `A`. */
 export type NonNull<T> = T extends null ? never : T;
+
+/** Keys of `V` that are not optional. */
+export type RequiredKeys<V> = { [K in keyof V]-?: {} extends Pick<V, K> ? never : K }[keyof V];

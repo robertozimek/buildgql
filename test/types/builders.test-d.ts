@@ -1,7 +1,7 @@
 import { leaf, object, objectArgs, args } from '../../src/runtime/builders.js';
 import { $, v } from '../../src/runtime/var.js';
 import type { Selected, VarsIn } from '../../src/types/select.js';
-import type { Node } from '../../src/types/node.js';
+import type { SelectionNode } from '../../src/types/selection.js';
 import type { RESULT, VARS } from '../../src/types/symbols.js';
 import type { Simplify } from '../../src/types/util.js';
 
@@ -28,7 +28,7 @@ const Root = {
   ),
 };
 
-declare function build<S extends readonly Node[]>(
+declare function build<S extends readonly SelectionNode[]>(
   pick: (r: typeof Root) => readonly [...S],
 ): { r: Selected<S>; v: Simplify<VarsIn<S>> };
 

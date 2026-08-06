@@ -1,5 +1,5 @@
 import type { Operation } from '../runtime/operation.js';
-import type { HasVars } from '../types/varargs.js';
+import type { HasVars } from '../types/vars.js';
 import { BuildQLHttpError, GraphQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 import type { SubscriptionTransport } from './subscribe.js';

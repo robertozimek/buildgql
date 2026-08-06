@@ -12,13 +12,21 @@ export type {
 export { args, leaf, leafArgs, object, objectArgs } from './runtime/builders.js';
 export { include, skip } from './runtime/directives.js';
 export { makeFragment, spread } from './runtime/fragment.js';
-export type { FragmentHandle } from './runtime/fragment.js';
+export type { Fragment } from './runtime/fragment.js';
 export { on } from './runtime/on.js';
 export { makeMutation, makeQuery, makeSubscription } from './runtime/operation.js';
 export type { Operation } from './runtime/operation.js';
-export type { FragmentDef } from './runtime/print.js';
 export { $, v } from './runtime/var.js';
-export type { AnySel, DirectiveNode, Node, On, Sel, Spread, SpreadTarget, VarRef } from './types/node.js';
+export type {
+  AnyFieldSelection,
+  Directive,
+  FieldSelection,
+  FragmentDefinition,
+  FragmentSpread,
+  InlineFragment,
+  SelectionNode,
+  VarRef,
+} from './types/selection.js';
 export type { Selected, VarsIn } from './types/select.js';
 export type { KEY, RESULT, VARS } from './types/symbols.js';
 export type { NonNull, Simplify, UnionToIntersection } from './types/util.js';

@@ -1,4 +1,4 @@
-import type { VarsArg } from '../../src/types/varargs.js';
+import type { VarsArg } from '../../src/types/vars.js';
 
 // A stand-in for any adapter/client function that takes an operation's variables as
 // its trailing parameter. Exercising `VarsArg` through a call signature (rather than

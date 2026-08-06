@@ -6,7 +6,8 @@ export interface VarRef {
   readonly gqlType: string;
 }
 
-export interface DirectiveNode {
+/** An `@include`/`@skip` directive attached to a field selection. */
+export interface Directive {
   readonly name: 'include' | 'skip';
   /** Either a literal boolean or a variable reference. */
   readonly if: boolean | VarRef;
@@ -16,16 +17,16 @@ export interface DirectiveNode {
  * A selected field.
  * `N` is the key it lands under in the result. It is carried by the phantom
  * `[KEY]` property — it MUST appear structurally, or `Extract`/`Exclude` cannot
- * tell two `Sel`s apart and the whole remap collapses.
+ * tell two selections apart and the whole remap collapses.
  * `O` marks the field optional in the result (set by `@include`/`@skip`).
  */
-export interface Sel<N extends string, R, V = {}, O extends boolean = false> {
+export interface FieldSelection<N extends string, R, V = {}, O extends boolean = false> {
   readonly kind: 'field';
   readonly name: string;
   readonly alias?: string;
   readonly args?: Record<string, unknown>;
-  readonly sels?: readonly Node[];
-  readonly directives?: readonly DirectiveNode[];
+  readonly sels?: readonly SelectionNode[];
+  readonly directives?: readonly Directive[];
   readonly varRefs?: readonly VarRef[];
   readonly [KEY]?: N;
   readonly [RESULT]?: R;
@@ -39,34 +40,35 @@ export interface Sel<N extends string, R, V = {}, O extends boolean = false> {
  * `src/runtime/fragment.ts` so `print.ts` and `fragment.ts` share one contract
  * instead of each re-declaring the shape behind a cast.
  */
-export interface SpreadTarget {
+export interface FragmentDefinition {
   readonly name: string;
   readonly typeCondition: string;
-  readonly sels: readonly Node[];
+  readonly sels: readonly SelectionNode[];
 }
 
 /** A fragment spread. Required `kind` discriminant makes Extract/Exclude work. */
-export interface Spread<R, V = {}> {
+export interface FragmentSpread<R, V = {}> {
   readonly kind: 'spread';
   /**
-   * The fragment being spread. Consumed by `collectFragments` and `collectVarRefs`.
-   * Its `name` is the single source of truth for the fragment's printed name — there
-   * is deliberately no separate `fragmentName` field to keep in sync with it.
+   * The fragment being spread. Consumed by `collectFragments` and the variable walk
+   * in `print.ts`. Its `name` is the single source of truth for the fragment's printed
+   * name — there is deliberately no separate `fragmentName` field to keep in sync.
    */
-  readonly handle: SpreadTarget;
+  readonly fragment: FragmentDefinition;
   readonly [RESULT]?: R;
   readonly [VARS]?: V;
 }
 
 /** An inline fragment (`... on Dog { ... }`). */
-export interface On<TN extends string, R, V = {}> {
+export interface InlineFragment<TN extends string, R, V = {}> {
   readonly kind: 'on';
   readonly typename: string;
-  readonly sels: readonly Node[];
+  readonly sels: readonly SelectionNode[];
   readonly [KEY]?: TN;
   readonly [RESULT]?: R;
   readonly [VARS]?: V;
 }
 
-export type AnySel = Sel<string, unknown, unknown, boolean>;
-export type Node = AnySel | Spread<unknown, unknown> | On<string, unknown, unknown>;
+export type AnyFieldSelection = FieldSelection<string, unknown, unknown, boolean>;
+export type SelectionNode =
+  AnyFieldSelection | FragmentSpread<unknown, unknown> | InlineFragment<string, unknown, unknown>;
