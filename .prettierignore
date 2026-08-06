@@ -3,3 +3,6 @@ node_modules
 test/perf/generated.ts
 test/perf/tsconfig.json
 package-lock.json
+# Git-ignored agent scratch (SDD ledgers, task briefs/reports, review diffs) — not
+# project source. Prettier doesn't read .gitignore, so this needs saying separately.
+.superpowers
