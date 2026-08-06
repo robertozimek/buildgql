@@ -20,18 +20,47 @@ export function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
 }
 
 /**
- * True when `type` binds tighter than a postfix `[]`, so `${type}[]` means what it looks
- * like. Identifiers, dotted qualified names, generic instantiations and object-literal
- * types all qualify.
+ * True when appending `[]` to `type` produces the type it looks like it produces — i.e.
+ * `type` has no top-level (bracket-depth-0) union `|`, intersection `&`, or arrow `=>`.
+ * Those three operators bind looser than a postfix `[]`, so e.g. `A | B[]` parses as
+ * `A | (B[])`, not `(A | B)[]` — the exact defect this function exists to prevent.
  *
- * A union does not: `string | number` + `[]` parses as `string | (number[])`, a different
- * and wrong type. Neither does a function type. Scalar mappings come from user config as
- * raw TypeScript source (`scalars: { JSON: 'string | number' }`), so either can arrive here.
+ * This is a bracket-depth scan, not a regex. A prior version used
+ * `/^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*(<.*>)?$/` for identifiers/generics and
+ * `/^\{.*\}$/` for object literals — both are bracket-depth-blind: `.*` spans from the
+ * first `<`/`{` to the LAST `>`/`}` in the whole string, so a multi-operand union or
+ * intersection whose final operand happens to end in `>` or `}` (e.g.
+ * `Record<string, unknown> | Array<unknown>`, `{ a: string } | { b: number }`) matched the
+ * regex end-to-end and was wrongly classified atomic — the identical wrong-parse defect
+ * this function exists to close, just relocated to a shape the regex couldn't see. Tracking
+ * nesting depth across `(`/`)`, `[`/`]`, `{`/`}` and `<`/`>`, and only inspecting `|`/`&`/`=>`
+ * once depth returns to 0, is the only way to find a top-level operator that a fixed-shape
+ * regex cannot express (a regex has no notion of "matching bracket depth").
+ *
+ * What this guarantees: every `|`, `&` or top-level `=>` in `type` is found, however deeply
+ * other operators are nested inside brackets elsewhere in the string, so `type` is correctly
+ * parenthesised before a postfix `[]` is appended.
+ *
+ * What this does NOT guarantee: this is not a TypeScript parser. It has no notion of string
+ * or template literals, comments, or conditional types (`T extends U ? X : Y`), so a scalar
+ * mapping containing a quoted `'|'` or unbalanced brackets could still be misclassified.
+ * Scalar mappings are short, hand-written raw type expressions from user config
+ * (`scalars: { JSON: 'string | number' }`), not arbitrary program source, so that residual
+ * gap is accepted rather than built out.
  */
 function isAtomicTypeExpression(type: string): boolean {
-  const named = /^[A-Za-z_$][\w$]*(\.[A-Za-z_$][\w$]*)*(<.*>)?$/;
-  const objectLiteral = /^\{.*\}$/;
-  return named.test(type) || objectLiteral.test(type);
+  let depth = 0;
+  for (let i = 0; i < type.length; i++) {
+    const ch = type[i];
+    if (ch === '(' || ch === '[' || ch === '{' || ch === '<') {
+      depth++;
+    } else if (ch === ')' || ch === ']' || ch === '}' || ch === '>') {
+      depth--;
+    } else if (depth === 0 && (ch === '|' || ch === '&' || (ch === '=' && type[i + 1] === '>'))) {
+      return false;
+    }
+  }
+  return true;
 }
 
 /** The TypeScript type of an *input* position, wrappers included. */
