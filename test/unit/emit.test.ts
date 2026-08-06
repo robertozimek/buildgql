@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { loadSchema } from '../../src/codegen/introspect.js';
 import { buildIR } from '../../src/codegen/ir.js';
-import { emit, unmappedScalars } from '../../src/codegen/emit.js';
+import { emit } from '../../src/codegen/emit.js';
+import { unmappedScalars } from '../../src/codegen/ts-types.js';
 import type { IRSchema } from '../../src/codegen/ir.js';
 import { DEFAULT_SCALARS } from '../../src/codegen/scalars.js';
 
