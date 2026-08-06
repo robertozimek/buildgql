@@ -254,6 +254,20 @@ incompatible ways.
   the adapters parse the printed document into the AST those clients expect. URL and
   `.json` introspection sources with the default client need no extra dependency.
 
+### Known limitation: `noUncheckedIndexedAccess`
+
+`$.argName` does not type-check in projects that enable TypeScript's
+`noUncheckedIndexedAccess`. The `$` proxy is typed as an index signature, so under that
+flag every read widens to `VarMarker | undefined`, which the argument types reject.
+
+Use the explicit form instead — it is unaffected:
+
+```ts
+import { v } from 'buildql';
+
+const q = query('User', ($, Q) => [Q.user({ id: v('id') }, (U) => [U.name])]);
+```
+
 ## License
 
 MIT
