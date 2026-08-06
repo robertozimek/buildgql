@@ -1,6 +1,6 @@
 import type { Operation } from '../runtime/operation.js';
 import type { VarsArg } from '../types/vars.js';
-import { toDocument } from './document.js';
+import { toDocument, variablesOf } from './document.js';
 import type { TypedDocumentNode } from './document.js';
 
 export type { TypedDocumentNode } from './document.js';
@@ -22,8 +22,12 @@ export function urqlDocument<R, V>(op: Operation<R, V>): TypedDocumentNode<R, V>
   return toDocument(op);
 }
 
-/** `{ query, variables }` for `useQuery(...)` / `useSubscription(...)`. */
+/**
+ * `{ query, variables }` for `useQuery(...)` / `useSubscription(...)`.
+ *
+ * No `assertKind` here, unlike the Apollo adapter: urql uses the `query` key for every
+ * operation kind, so there is no wrong kind to reject.
+ */
 export function toUrqlArgs<R, V>(op: Operation<R, V>, ...rest: VarsArg<V>): UrqlArgs<R, V> {
-  const [vars] = rest as [V | undefined];
-  return { query: toDocument(op), variables: (vars ?? {}) as V };
+  return { query: toDocument(op), variables: variablesOf(rest) };
 }

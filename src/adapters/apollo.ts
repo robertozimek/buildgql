@@ -1,6 +1,6 @@
 import type { Operation } from '../runtime/operation.js';
 import type { VarsArg } from '../types/vars.js';
-import { assertKind, toDocument } from './document.js';
+import { assertKind, toDocument, variablesOf } from './document.js';
 import type { TypedDocumentNode } from './document.js';
 
 export type { TypedDocumentNode } from './document.js';
@@ -31,13 +31,11 @@ export function apolloDocument<R, V>(op: Operation<R, V>): TypedDocumentNode<R, 
  */
 export function toApolloQuery<R, V>(op: Operation<R, V>, ...rest: VarsArg<V>): ApolloQueryArgs<R, V> {
   assertKind(op, ['query', 'subscription'], 'toApolloQuery');
-  const [vars] = rest as [V | undefined];
-  return { query: toDocument(op), variables: (vars ?? {}) as V };
+  return { query: toDocument(op), variables: variablesOf(rest) };
 }
 
 /** `{ mutation, variables }` for `apolloClient.mutate()`. */
 export function toApolloMutation<R, V>(op: Operation<R, V>, ...rest: VarsArg<V>): ApolloMutationArgs<R, V> {
   assertKind(op, ['mutation'], 'toApolloMutation');
-  const [vars] = rest as [V | undefined];
-  return { mutation: toDocument(op), variables: (vars ?? {}) as V };
+  return { mutation: toDocument(op), variables: variablesOf(rest) };
 }

@@ -1,6 +1,7 @@
 import { parse } from 'graphql';
 import type { DocumentNode } from 'graphql';
 import type { Operation } from '../runtime/operation.js';
+import type { VarsArg } from '../types/vars.js';
 
 export type OperationKind = Operation<unknown, unknown>['kind'];
 
@@ -57,4 +58,15 @@ export function assertKind(
         `but "${op.name}" is a ${op.kind}.`,
     );
   }
+}
+
+/**
+ * The variables from an adapter's trailing rest parameter, defaulting to `{}`.
+ *
+ * `VarsArg` makes the slot optional only when every variable is optional, so the
+ * `{}` fallback is reachable exactly when it is correct.
+ */
+export function variablesOf<V>(rest: VarsArg<V>): V {
+  const [vars] = rest as [V | undefined];
+  return (vars ?? {}) as V;
 }
