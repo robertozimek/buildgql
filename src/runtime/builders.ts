@@ -2,7 +2,7 @@ import type { AnyFieldSelection, FieldSelection, SelectionNode, VarRef } from '.
 import type { Apply, Wrap } from '../types/wrap.js';
 import type { Selected, VarsIn } from '../types/select.js';
 import type { ArgSpec, ArgsInput, VarMarker, VarsOf } from '../types/vars.js';
-import { isVarMarker, markerName } from './var.js';
+import { enumValue, isVarMarker, markerName, varRefValue } from './markers.js';
 
 /** Declares a field's argument types (compile time) and GraphQL types (runtime). */
 export function args<T>(gql: Readonly<Record<string, string>>, enums?: readonly string[]): ArgSpec<T> {
@@ -16,7 +16,7 @@ interface SplitArgs {
 
 function markEnums(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(markEnums);
-  return typeof value === 'string' ? { __enum: value } : value;
+  return typeof value === 'string' ? enumValue(value) : value;
 }
 
 function splitArgs(argv: Record<string, unknown>, spec: ArgSpec<unknown>): SplitArgs {
@@ -31,7 +31,7 @@ function splitArgs(argv: Record<string, unknown>, spec: ArgSpec<unknown>): Split
         throw new Error(`buildql: unknown argument "${key}" (no GraphQL type recorded for it)`);
       }
       varRefs.push({ varName, gqlType });
-      literals[key] = { __varRef: varName };
+      literals[key] = varRefValue(varName);
     } else {
       literals[key] = spec.enums?.includes(key) ? markEnums(value) : value;
     }

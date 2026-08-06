@@ -7,26 +7,13 @@ import type {
   SelectionNode,
   VarRef,
 } from '../types/selection.js';
-
-interface VarRefMarker {
-  readonly __varRef: string;
-}
-
-function isVarRefMarker(x: unknown): x is VarRefMarker {
-  return typeof x === 'object' && x !== null && typeof (x as VarRefMarker).__varRef === 'string';
-}
+import { ENUM, VAR_REF, isEnumValue, isVarRefValue } from './markers.js';
 
 /** GraphQL value literal serialisation. Enum values arrive pre-marked by codegen. */
 function printValue(value: unknown): string {
-  if (isVarRefMarker(value)) return `$${value.__varRef}`;
+  if (isVarRefValue(value)) return `$${value[VAR_REF]}`;
   if (value === null || value === undefined) return 'null';
-  if (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { __enum?: unknown }).__enum === 'string'
-  ) {
-    return (value as { __enum: string }).__enum;
-  }
+  if (isEnumValue(value)) return value[ENUM];
   if (typeof value === 'string') return JSON.stringify(value);
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (Array.isArray(value)) return `[${value.map(printValue).join(', ')}]`;
@@ -77,7 +64,7 @@ function printSels(sels: readonly SelectionNode[]): string {
 }
 
 /** Walks the whole tree, including inline fragments, spreads and directives. */
-export function collectVarRefs(sels: readonly SelectionNode[]): VarRef[] {
+function collectVarRefs(sels: readonly SelectionNode[]): VarRef[] {
   const out: VarRef[] = [];
   const walk = (nodes: readonly SelectionNode[]): void => {
     for (const n of nodes) {
