@@ -68,7 +68,10 @@ function errorMessage(err: unknown): string {
  * that requires transformation (e.g. `enum`, parameter properties, namespaces).
  */
 function isMissingTypeStrippingSupport(err: unknown): boolean {
-  return isRecord(err) && (err.code === 'ERR_UNKNOWN_FILE_EXTENSION' || err.code === 'ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX');
+  return (
+    isRecord(err) &&
+    (err.code === 'ERR_UNKNOWN_FILE_EXTENSION' || err.code === 'ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX')
+  );
 }
 
 /**
@@ -130,7 +133,8 @@ export async function loadConfig(
       mod = await importModule(pathToFileURL(path).href);
     } catch (err) {
       if ((name.endsWith('.ts') || name.endsWith('.mts')) && isMissingTypeStrippingSupport(err)) {
-        missingTypeStrippingMessage = `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
+        missingTypeStrippingMessage =
+          `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
           `(Node >= 22.6 with --experimental-strip-types, or Node >= 23.6). ` +
           `Otherwise rename it to buildql.config.mjs. Original error: ${errorMessage(err)}`;
         // Surface the skip immediately — don't defer it to the "nothing loaded" path,

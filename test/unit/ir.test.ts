@@ -52,7 +52,9 @@ describe('buildIR', () => {
 
   it('marks nullable arguments optional and records GraphQL type strings', async () => {
     const s = await ir();
-    const createUser = s.types.find((t) => t.name === 'Mutation')!.fields.find((f) => f.name === 'createUser')!;
+    const createUser = s.types
+      .find((t) => t.name === 'Mutation')!
+      .fields.find((f) => f.name === 'createUser')!;
     expect(createUser.args.map((a) => [a.name, a.gqlType, a.optional])).toEqual([
       ['name', 'String!', false],
       ['email', 'String!', false],

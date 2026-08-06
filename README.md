@@ -101,7 +101,7 @@ q.post({ id: v('postId') }, (post) => [post.title]);
 Optional schema arguments produce optional variables — TypeScript handles the rest.
 
 Enum arguments passed as literals print unquoted (`status: PUBLISHED`, not
-`status: "PUBLISHED"`), *except* when the enum is nested inside an input-object
+`status: "PUBLISHED"`), _except_ when the enum is nested inside an input-object
 literal (e.g. `{ filter: { status: 'PUBLISHED' } }`) — the printer has no view of
 the input type graph at that depth, so it falls back to a quoted string there. If
 you hit this, pass the value as a variable instead (`{ filter: $.filter }`); JSON
@@ -116,10 +116,7 @@ const NameBits = userFragment('NameBits', (user) => [user.firstName, user.lastNa
 
 query('Feed', ($, q) => [
   q.users((user) => [user.id, spread(NameBits)]),
-  q.pet((pet) => [
-    on('Dog', Dog, (dog) => [dog.breed]),
-    on('Cat', Cat, (cat) => [cat.lives]),
-  ]),
+  q.pet((pet) => [on('Dog', Dog, (dog) => [dog.breed]), on('Cat', Cat, (cat) => [cat.lives])]),
   q.me((me) => [include(me.email, v('withEmail'))]),
 ]);
 ```
@@ -173,12 +170,8 @@ export default defineConfig({
 import { query, mutation, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
 import { useQuery } from '@apollo/client';
 
-const UserById = query('UserById', ($, q) => [
-  q.user({ id: $.id }, (user) => [user.id, user.firstName]),
-]);
-const CreateUser = mutation('CreateUser', ($, m) => [
-  m.createUser({ name: $.name }, (user) => [user.id]),
-]);
+const UserById = query('UserById', ($, q) => [q.user({ id: $.id }, (user) => [user.id, user.firstName])]);
+const CreateUser = mutation('CreateUser', ($, m) => [m.createUser({ name: $.name }, (user) => [user.id])]);
 
 // Imperative API — the adapter returns Apollo's options object verbatim.
 const { data } = await apolloClient.query(toApolloQuery(UserById, { id: '7' }));
@@ -200,12 +193,8 @@ take the same `{ query, variables }` shape. Passing a mutation to `toApolloQuery
 import { query, mutation, toUrqlArgs, urqlDocument } from './src/gql';
 import { useQuery, useMutation } from 'urql';
 
-const UserById = query('UserById', ($, q) => [
-  q.user({ id: $.id }, (user) => [user.id, user.firstName]),
-]);
-const CreateUser = mutation('CreateUser', ($, m) => [
-  m.createUser({ name: $.name }, (user) => [user.id]),
-]);
+const UserById = query('UserById', ($, q) => [q.user({ id: $.id }, (user) => [user.id, user.firstName])]);
+const CreateUser = mutation('CreateUser', ($, m) => [m.createUser({ name: $.name }, (user) => [user.id])]);
 
 // urql's useQuery/useSubscription take { query, variables }; useMutation and the
 // positional client methods take the document on its own — use urqlDocument for those.

@@ -107,7 +107,9 @@ async function introspectUrl(url: string, opts: LoadOptions): Promise<Introspect
     throw new Error(`buildql: introspection of ${url} did not return valid JSON: ${raw.slice(0, 200)}`);
   }
   if (payload.errors && payload.errors.length > 0) {
-    throw new Error(`buildql: introspection of ${url} failed: ${payload.errors.map((e) => e.message).join('; ')}`);
+    throw new Error(
+      `buildql: introspection of ${url} failed: ${payload.errors.map((e) => e.message).join('; ')}`,
+    );
   }
   if (!payload.data?.__schema) {
     throw new Error(`buildql: introspection of ${url} returned no __schema`);
@@ -136,8 +138,7 @@ async function introspectSdl(source: string): Promise<IntrospectionResult> {
 
 async function introspectJson(source: string): Promise<IntrospectionResult> {
   const raw = JSON.parse(await readFile(source, 'utf8')) as
-    | IntrospectionResult
-    | { data: IntrospectionResult };
+    IntrospectionResult | { data: IntrospectionResult };
   const schema = '__schema' in raw ? raw : raw.data;
   if (!schema?.__schema) {
     throw new Error(`buildql: "${source}" does not contain an introspection result (no __schema key)`);

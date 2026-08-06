@@ -28,6 +28,8 @@ type _1 = Expect<
 
 // the same fragment reused elsewhere keeps its type
 const q2 = query('Users2', ($, Q) => [Q.users((U) => [spread(NameBits)])]);
-type _2 = Expect<Eq<NonNullable<(typeof q2)[typeof RESULT]>, { users: { firstName: string; lastName: string | null }[] }>>;
+type _2 = Expect<
+  Eq<NonNullable<(typeof q2)[typeof RESULT]>, { users: { firstName: string; lastName: string | null }[] }>
+>;
 
 export { q, q2 };

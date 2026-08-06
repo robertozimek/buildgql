@@ -17,6 +17,8 @@ it('builds a query document', () => {
 });
 
 it('builds a mutation document with hoisted variables', () => {
-  const m = makeMutation(Mutation)('CreateNewUser', ($, M) => [M.createUser({ name: $.name }, (U) => [U.id])]);
+  const m = makeMutation(Mutation)('CreateNewUser', ($, M) => [
+    M.createUser({ name: $.name }, (U) => [U.id]),
+  ]);
   expect(m.document).toBe('mutation CreateNewUser($name: String!) { createUser(name: $name) { id } }');
 });

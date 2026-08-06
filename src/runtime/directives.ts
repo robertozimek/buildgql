@@ -38,7 +38,10 @@ function applyDirective<N extends string, R, V, Name extends string>(
  * signature*, which then intersects into the operation's variables type and makes
  * the whole operation untypeable by its caller.
  */
-export function include<N extends string, R, V>(sel: Sel<N, R, V, boolean>, cond: boolean): Sel<N, R, V, true>;
+export function include<N extends string, R, V>(
+  sel: Sel<N, R, V, boolean>,
+  cond: boolean,
+): Sel<N, R, V, true>;
 export function include<N extends string, R, V, Name extends string>(
   sel: Sel<N, R, V, boolean>,
   cond: VarMarker<Name>,

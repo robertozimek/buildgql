@@ -60,7 +60,10 @@ it('reusing the same fragment handle twice does not throw and emits one definiti
   const Bits = userFragment('Bits', (U) => [U.firstName]);
   let q!: ReturnType<typeof query>;
   expect(() => {
-    q = query('Users', ($, Q) => [Q.users((U) => [spread(Bits)]), Q.users.as('again')((U) => [spread(Bits)])]);
+    q = query('Users', ($, Q) => [
+      Q.users((U) => [spread(Bits)]),
+      Q.users.as('again')((U) => [spread(Bits)]),
+    ]);
   }).not.toThrow();
   expect(q.document.match(/fragment Bits on User/g)).toHaveLength(1);
 });

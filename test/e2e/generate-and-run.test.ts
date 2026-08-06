@@ -102,7 +102,11 @@ it('generates a module that type-checks under strict mode', async () => {
 
 it('executes generated operations against the real server, including an unquoted enum literal', async () => {
   type PostsResult = {
-    posts: { id: string; title: string; author: { id: string; firstName: string; lastName: string | null } }[];
+    posts: {
+      id: string;
+      title: string;
+      author: { id: string; firstName: string; lastName: string | null };
+    }[];
   };
   type CreateUserResult = { createUser: { id: string; firstName: string } };
   type PetResult = { pet: { __typename: 'Dog'; breed: string } | { __typename: 'Cat'; lives: number } };
@@ -217,7 +221,10 @@ toUrqlArgs(byStatus, { status: 'ARCHIVED' });
   const mod = (await import(pathToFileURL(urqlUsageFile).href)) as {
     readonly q: Operation<PostsResult, {}>;
     readonly byStatus: Operation<ByStatusResult, { status: 'DRAFT' | 'PUBLISHED' }>;
-    readonly withVars: { query: { kind: string; definitions: readonly unknown[] }; variables: { status: string } };
+    readonly withVars: {
+      query: { kind: string; definitions: readonly unknown[] };
+      variables: { status: string };
+    };
     readonly noVars: { query: { kind: string }; variables: Record<string, never> };
     readonly doc: { kind: string };
   };

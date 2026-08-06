@@ -12,9 +12,7 @@ it('prints inline fragments and auto-selects __typename', () => {
   const q = query('Pet', ($, Q) => [
     Q.pet((P) => [P.name, on('Dog', Dog, (D) => [D.breed]), on('Cat', Cat, (C) => [C.lives])]),
   ]);
-  expect(q.document).toBe(
-    'query Pet { pet { __typename name ... on Dog { breed } ... on Cat { lives } } }',
-  );
+  expect(q.document).toBe('query Pet { pet { __typename name ... on Dog { breed } ... on Cat { lives } } }');
 });
 
 it('does not add __typename when there are no inline fragments', () => {

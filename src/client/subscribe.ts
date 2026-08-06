@@ -14,7 +14,11 @@ export interface StreamChunk {
 
 export interface SubscriptionTransport {
   /** `headers` carries per-subscription headers from `client.subscribe(op, vars, { headers })`. */
-  subscribe(payload: SubscribePayload, signal: AbortSignal, headers?: HeadersInit): AsyncIterable<StreamChunk>;
+  subscribe(
+    payload: SubscribePayload,
+    signal: AbortSignal,
+    headers?: HeadersInit,
+  ): AsyncIterable<StreamChunk>;
 }
 
 export interface SseTransportOptions {
@@ -95,7 +99,8 @@ export function sseTransport(opts: SseTransportOptions): SubscriptionTransport {
 
 export interface WsTransportOptions {
   readonly url: string;
-  readonly connectionParams?: Record<string, unknown> | (() => Record<string, unknown> | Promise<Record<string, unknown>>);
+  readonly connectionParams?:
+    Record<string, unknown> | (() => Record<string, unknown> | Promise<Record<string, unknown>>);
   readonly WebSocket?: typeof WebSocket;
 }
 
@@ -125,7 +130,9 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
       socket.onopen = async () => {
         try {
           const params =
-            typeof opts.connectionParams === 'function' ? await opts.connectionParams() : opts.connectionParams;
+            typeof opts.connectionParams === 'function'
+              ? await opts.connectionParams()
+              : opts.connectionParams;
           // The signal may have aborted, or the socket may already have closed, while
           // we were awaiting `connectionParams()` above — sending on a socket that
           // isn't open throws synchronously on a real `WebSocket`. Since nothing awaits

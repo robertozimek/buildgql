@@ -49,10 +49,7 @@ it('applies scalar overrides from config', async () => {
 
 it('warns by name about a custom scalar with no entry in "scalars"', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
-  await writeFile(
-    join(dir, 'schema.graphql'),
-    'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n',
-  );
+  await writeFile(join(dir, 'schema.graphql'), 'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n');
 
   await generate({ schema: './schema.graphql' }, dir);
 
@@ -62,10 +59,7 @@ it('warns by name about a custom scalar with no entry in "scalars"', async () =>
 
 it('does not warn once the scalar is mapped in config', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
-  await writeFile(
-    join(dir, 'schema.graphql'),
-    'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n',
-  );
+  await writeFile(join(dir, 'schema.graphql'), 'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n');
 
   await generate({ schema: './schema.graphql', scalars: { DateTime: 'string' } }, dir);
 

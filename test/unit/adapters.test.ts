@@ -21,12 +21,7 @@ const query = makeQuery({
   user: objectArgs('user', ['!'], User, args<{ id: string }>({ id: 'ID!' })),
 });
 const mutation = makeMutation({
-  createUser: objectArgs(
-    'createUser',
-    ['!'],
-    User,
-    args<{ name: string }>({ name: 'String!' }),
-  ),
+  createUser: objectArgs('createUser', ['!'], User, args<{ name: string }>({ name: 'String!' })),
 });
 const subscription = makeSubscription({
   ticks: leafArgs<'ticks', ['!'], string, { room?: string }>(
