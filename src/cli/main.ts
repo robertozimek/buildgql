@@ -33,7 +33,12 @@ export async function main(argv: string[], reporter: Reporter = consoleReporter)
     reporter.info(`buildql: wrote ${out}`);
     return 0;
   } catch (err) {
-    reporter.warn(err instanceof Error ? err.message : String(err));
+    const message = err instanceof Error ? err.message : String(err);
+    // Errors buildql itself throws already carry the prefix (house rule, enforced by
+    // review, not by a lint rule). An unwrapped Node error crossing this boundary — a raw
+    // ENOENT/EACCES from the filesystem, a rejected `fetch` — would not, so it is added
+    // here rather than trusted to already be there.
+    reporter.warn(message.startsWith('buildql: ') ? message : `buildql: ${message}`);
     return 1;
   }
 }
