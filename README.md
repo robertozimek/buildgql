@@ -61,6 +61,9 @@ export default defineConfig({
 
   output: './src/gql',
   scalars: { DateTime: 'string', JSON: 'unknown' },
+
+  // 'buildql' (default) | 'apollo' | 'urql' | 'none' — see "Using Apollo or urql"
+  client: 'buildql',
 });
 ```
 
@@ -150,6 +153,88 @@ The generated module only exports `subscription` when your schema declares a
 `Subscription` root type — build subscription operations with it the same way
 you build queries and mutations with `query`/`mutation`.
 
+## Using Apollo or urql
+
+buildql's own `createClient` is the default, but the generated operations are just
+documents plus inferred types — they run through any GraphQL client. Set `client`
+in your config and the generated module re-exports that client's adapter instead
+of `createClient`:
+
+```js
+export default defineConfig({
+  schema: 'https://api.example.com/graphql',
+  client: 'apollo', // or 'urql'
+});
+```
+
+**Apollo Client:**
+
+```ts
+import { query, $, apolloDocument, toApolloQuery, toApolloMutation } from './src/gql';
+import { useQuery } from '@apollo/client';
+
+const UserById = query('UserById', ($, Q) => [Q.user({ id: $.id }, (U) => [U.id, U.firstName])]);
+
+// Imperative API — the adapter returns Apollo's options object verbatim.
+const { data } = await apolloClient.query(toApolloQuery(UserById, { id: '7' }));
+//      ^? { user: { id: string; firstName: string } }
+
+await apolloClient.mutate(toApolloMutation(CreateUser, { name: 'Ada' }));
+
+// Hooks take the document positionally, so pass `apolloDocument(...)`.
+const { data } = useQuery(apolloDocument(UserById), { variables: { id: '7' } });
+```
+
+`toApolloQuery` also covers `client.watchQuery()` and `client.subscribe()`, which
+take the same `{ query, variables }` shape. Passing a mutation to `toApolloQuery`
+(or a query to `toApolloMutation`) throws — Apollo keys those options differently.
+
+**urql:**
+
+```ts
+import { query, $, toUrqlArgs, urqlDocument } from './src/gql';
+import { useQuery, useMutation } from 'urql';
+
+// urql uses `{ query, variables }` for queries, mutations and subscriptions alike.
+const [result] = useQuery(toUrqlArgs(UserById, { id: '7' }));
+//     ^? { data?: { user: { id: string; firstName: string } } }
+
+const [, createUser] = useMutation(urqlDocument(CreateUser));
+await urqlClient.query(urqlDocument(UserById), { id: '7' });
+```
+
+Both adapters return a `TypedDocumentNode<Result, Variables>` — the same phantom-typed
+node Apollo and urql already understand — so `data` and `variables` are typed
+end-to-end with no extra generics at the call site.
+
+Variables follow the same rule as `client.execute`: required schema arguments make the
+`vars` argument mandatory, all-optional ones make it omissible.
+
+You can also import the adapters directly without touching your config:
+
+```ts
+import { toApolloQuery } from 'buildql/adapters/apollo';
+import { toUrqlArgs } from 'buildql/adapters/urql';
+```
+
+Adapters need the `graphql` package installed — they parse the printed document into
+the AST these clients require. Setting `client: 'none'` binds no client at all, if you
+want to wire one up yourself.
+
+## Relay
+
+Relay is **not** supported, and no adapter is planned.
+
+Relay's store does not consume GraphQL documents at runtime. It requires
+`ConcreteRequest` artifacts emitted ahead of time by relay-compiler — a normalization
+AST, hashed identifiers, and a fragment-per-component model that the compiler derives
+from source files it has scanned. buildql builds its documents at runtime from
+TypeScript selections, so there is nothing for relay-compiler to read and nothing for
+the store to normalize against.
+
+If you use Relay, use its own compiler. buildql and Relay solve the same problem in
+incompatible ways.
+
 ## Requirements
 
 - TypeScript **>= 5.4** with `"strict": true`
@@ -158,8 +243,10 @@ you build queries and mutations with `query`/`mutation`.
   support: **>= 22.6 with `--experimental-strip-types`, or >= 23.6**. Use
   `buildql.config.mjs` (see **Configure** above) if you're on an older Node —
   it works everywhere Node >= 18 does.
-- `graphql` only if you point `schema` at an SDL file — URL and `.json`
-  introspection sources need no extra dependency
+- `graphql` if you point `schema` at an SDL file, **or** if you use an Apollo/urql
+  adapter (`client: 'apollo' | 'urql'`, or a direct `buildql/adapters/*` import) —
+  the adapters parse the printed document into the AST those clients expect. URL and
+  `.json` introspection sources with the default client need no extra dependency.
 
 ## License
 
