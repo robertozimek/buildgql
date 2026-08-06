@@ -935,17 +935,17 @@ git commit -m "refactor(runtime): unify internal markers on symbols, fixing __en
 
 ### Task 6: Rename the field builders
 
-`args`, `object`, and `leaf` are extremely generic identifiers for root exports of a published package, and `object` in particular reads badly at the top of every generated module. The family becomes `argSpec` plus `<kind>Field[Args]`. The four near-identical three-line cast comments in this file collapse to one file-level note.
+`args`, `object`, and `leaf` are extremely generic identifiers for root exports of a published package, and `object` in particular reads badly at the top of every generated module. The family becomes `argSpec` plus `<kind>Field[Args]`. The seven near-identical two-line cast comments in this file collapse to one file-level note.
 
 **Deliberate non-change:** the four `Object.assign(make(undefined), { as })` blocks stay duplicated. Abstracting them behind a generic `withAlias<Base, AsFn>()` helper would add generic indirection to the hottest path in the type checker, and `npm run test:perf` enforces a 25,000-instantiation budget. DRY loses to the measured constraint here.
 
 **Files:**
 
 - Modify: `src/runtime/builders.ts`
-- Modify: `src/index.ts:7`
-- Modify: `src/codegen/emit.ts:12-26, 114-125`
-- Modify: `test/perf/schema.gen.mjs:5, 8, 10`
-- Modify: `test/unit/builders.test.ts`, `test/unit/print.test.ts`, `test/unit/emit.test.ts`, `test/types/*.test-d.ts`
+- Modify: `src/index.ts:12`
+- Modify: `src/codegen/emit.ts:12-26, 100-105, 112-126, 160`
+- Modify: `test/perf/schema.gen.mjs:5, 9, 10`
+- Modify: `test/unit/*.test.ts` (all of them reference the old names; `builders`, `print`, `emit` and `cli` most heavily — `test/unit/cli.test.ts:47` asserts on the literal string `"leaf<'id', ['!'], MyId>"` in emitter output), `test/types/*.test-d.ts`
 - Modify: `README.md`
 
 **Interfaces:**
@@ -981,7 +981,7 @@ Expected: FAIL — the emitted source still says `args`, `leaf`, `object`.
 
 Apply these renames in `src/runtime/builders.ts`: `args` → `argSpec`, `leaf` → `leafField`, `leafArgs` → `leafFieldArgs`, `object` → `objectField`, `objectArgs` → `objectFieldArgs`, and the private `node` → `makeFieldNode`.
 
-Then replace the four repeated cast comments with one note directly above `leafField`, and reduce each site to a one-line pointer:
+Then replace the seven repeated cast comments with one note directly above `leafField`, and reduce each site to a one-line pointer:
 
 ```ts
 /**
@@ -1012,11 +1012,11 @@ export function leafField<N extends string, const W extends Wrap, T>(
 }
 ```
 
-Apply the same `// Phantom cast — see the file note above.` one-liner at the other seven cast sites.
+Apply the same `// Phantom cast — see the file note above.` one-liner at the other six cast sites (there are seven `as unknown as` casts in the file; the one above is the first). Re-count after Task 5 lands, since it also edits this file.
 
 - [ ] **Step 4: Update the public export**
 
-In `src/index.ts`, line 7:
+In `src/index.ts`, line 12:
 
 ```ts
 export { argSpec, leafField, leafFieldArgs, objectField, objectFieldArgs } from './runtime/builders.js';
@@ -1081,7 +1081,7 @@ const typename = `  __typename: leafField<'__typename', ['!'], ${typenameTsType(
 
 - [ ] **Step 6: Update the type-perf fixture generator**
 
-In `test/perf/schema.gen.mjs`, lines 5, 8 and 10:
+In `test/perf/schema.gen.mjs`, lines 5, 9 and 10:
 
 ```js
 const lines = [`import { leafField, objectField, makeQuery } from '../../src/index.js';`];
@@ -1126,21 +1126,18 @@ git commit -m "refactor: rename field builders to argSpec and <kind>Field[Args]"
 - Modify: `src/client/errors.ts`
 - Modify: `src/client/client.ts`, `src/client/subscribe.ts`, `src/index.ts`
 - Modify: `test/unit/client.test.ts`, `test/unit/subscribe.test.ts`
-- Modify: `README.md`
 - Test: `test/unit/client.test.ts`
 
 **Interfaces:**
 
 - Consumes: nothing from earlier tasks
-- Produces: `abstract class BuildQLError extends Error`; `class BuildQLHttpError extends BuildQLError` (unchanged fields `status`, `body`); `class BuildQLResponseError extends BuildQLError` (renamed from `GraphQLResponseError`; unchanged fields `errors`, `data`). Tasks 8 and 11 throw these.
+- Produces: `abstract class BuildQLError extends Error`; `class BuildQLHttpError extends BuildQLError` (unchanged fields `status`, `body`); `class BuildQLResponseError extends BuildQLError` (renamed from `GraphQLResponseError`; unchanged fields `errors`, `data`). Tasks 8 and 9 throw these. (Task 8's `create-client.ts` carries the existing `throw` sites; Task 9's `sse-transport.ts` and `ws-transport.ts` construct them.)
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `test/unit/client.test.ts`:
+In `test/unit/client.test.ts`, change the existing line 5 import to `import { BuildQLError, BuildQLHttpError, BuildQLResponseError } from '../../src/client/errors.js';` (do NOT add a second import — a duplicate binding is `tsc` error TS2300, which esbuild/vitest silently dedupes so it would only surface at Step 6). Then append the test:
 
 ```ts
-import { BuildQLError, BuildQLHttpError, BuildQLResponseError } from '../../src/client/errors.js';
-
 it('lets one instanceof check catch every buildql error', () => {
   expect(new BuildQLHttpError(500, 'boom')).toBeInstanceOf(BuildQLError);
   expect(new BuildQLResponseError([{ message: 'nope' }], undefined)).toBeInstanceOf(BuildQLError);
@@ -1205,10 +1202,10 @@ export class BuildQLHttpError extends BuildQLError {
 - [ ] **Step 4: Update every reference**
 
 ```bash
-grep -rln "GraphQLResponseError" src test README.md
+grep -rln "GraphQLResponseError" src test
 ```
 
-Rename to `BuildQLResponseError` in each — `src/client/client.ts` (import plus two `throw` sites), `src/client/subscribe.ts` (import plus two sites), `src/index.ts`, and the tests.
+Rename to `BuildQLResponseError` in each — `src/client/client.ts` (line 3 import, the line 8 re-export, and the two `throw` sites at lines 92 and 127), `src/client/subscribe.ts` (import plus two sites), `src/index.ts`, and the tests. Line 8 also gains the base class — it is the `buildql/client` entry point until Task 8 moves it to `src/client/index.ts`: `export { BuildQLError, BuildQLHttpError, BuildQLResponseError } from './errors.js';`. `test/unit/client.test.ts`'s import was already renamed by Step 1 — don't add a second import there.
 
 In `src/index.ts`, line 3 becomes:
 
@@ -1227,7 +1224,7 @@ Run: `npm run check`
 Expected: PASS
 
 ```bash
-git add -A src test README.md
+git add -A src test
 git commit -m "refactor(client): add BuildQLError base and rename GraphQLResponseError"
 ```
 
@@ -1235,9 +1232,9 @@ git commit -m "refactor(client): add BuildQLError base and rename GraphQLRespons
 
 ### Task 8: Split the client module
 
-`src/client/client.ts` stutters in its path, defines `createClient`, _and_ re-exports eight names that `src/index.ts` re-exports again — two hand-maintained copies of the same list, free to drift. Header merging is open-coded in three places.
+`src/client/client.ts` stutters in its path, defines `createClient`, _and_ re-exports eight names that `src/index.ts` re-exports again — two hand-maintained copies of the same list, free to drift. Header merging is open-coded in three places; this task unifies two of them — the third, `sseTransport`, lives in `subscribe.ts` and is unified when Task 9 splits that file out.
 
-The microtask subtlety documented at `client.ts:106-111` must survive: `subscribe` deliberately does not route through an `async` helper, because `await`-ing one defers a tick even when the value is already resolved, and `wsTransport` opens its socket synchronously in that same turn. The extraction below therefore shares only the _merge_ loop; `subscribe` keeps its inline ternary and its comment.
+The microtask subtlety documented at `client.ts:115-120` must survive: `subscribe` deliberately does not route through an `async` helper, because `await`-ing one defers a tick even when the value is already resolved, and `wsTransport` opens its socket synchronously in that same turn. The extraction below therefore shares only the _merge_ loop; `subscribe` keeps its inline ternary and its comment.
 
 **Files:**
 
@@ -1245,7 +1242,6 @@ The microtask subtlety documented at `client.ts:106-111` must survive: `subscrib
 - Create: `src/client/create-client.ts` (from `src/client/client.ts`)
 - Create: `src/client/index.ts`
 - Delete: `src/client/client.ts`
-- Modify: `src/client/subscribe.ts:55-66`
 - Modify: `src/index.ts`
 - Modify: `package.json` (`exports["./client"]`, `typesVersions.client`)
 - Modify: `tsup.config.ts`
@@ -1286,7 +1282,7 @@ export function mergeHeaders(base: HeadersInit, override?: HeadersInit): Headers
 
 - [ ] **Step 2: Create `src/client/create-client.ts`**
 
-`git mv src/client/client.ts src/client/create-client.ts`, then: delete the four re-export lines (7–10), switch `ClientOptions.headers`/`SseTransportOptions.headers` to `HeadersSource`, delete the local `resolveHeaders`, and route the two header paths through the new helpers.
+`git mv src/client/client.ts src/client/create-client.ts`, then: delete the four re-export statements (lines 7–15, i.e. through `} from './subscribe.js';`), switch `ClientOptions.headers` to `HeadersSource`, delete the local `resolveHeaders`, and route the two header paths through the new helpers.
 
 ```ts
 import type { Operation } from '../runtime/operation.js';
@@ -1345,11 +1341,11 @@ export { wsTransport } from './ws-transport.js';
 export type { WsTransportOptions } from './ws-transport.js';
 ```
 
-(If Task 9 has not run yet, point the last four lines at `./subscribe.js` and correct them there.)
+(If Task 9 has not run yet, point all five `./sse-transport.js` / `./transport.js` / `./ws-transport.js` lines at `./subscribe.js` — it exports all five names today — and correct them in Task 9.)
 
 - [ ] **Step 4: Collapse `src/index.ts`'s duplicate list**
 
-Replace lines 1–6 of `src/index.ts` with a single re-export of the barrel:
+Replace lines 1–11 of `src/index.ts` (the whole client re-export block, through `} from './client/subscribe.js';`) with a single re-export of the barrel:
 
 ```ts
 export {
@@ -1416,7 +1412,7 @@ git commit -m "refactor(client): split create-client from the barrel, extract he
 
 ### Task 9: Split the subscription transports and extract an async queue
 
-`src/client/subscribe.ts` is 205 lines carrying three responsibilities: the transport contract, an SSE implementation, and a WebSocket implementation. Inside it, `wsTransport.subscribe` is a ~95-line function juggling six mutable closure variables (`queue`, `done`, `completed`, `aborted`, `failure`, `wake`) that together are a hand-rolled push-driven async iterator. Four of those are queue mechanics and belong in a testable unit; two (`completed`, `aborted`) are graphql-ws protocol state and stay.
+`src/client/subscribe.ts` is 212 lines carrying three responsibilities: the transport contract, an SSE implementation, and a WebSocket implementation. Inside it, `wsTransport.subscribe` is a ~95-line function juggling six mutable closure variables (`queue`, `done`, `completed`, `aborted`, `failure`, `wake`) that together are a hand-rolled push-driven async iterator. Four of those are queue mechanics and belong in a testable unit; two (`completed`, `aborted`) are graphql-ws protocol state and stay.
 
 **Files:**
 
@@ -1553,7 +1549,7 @@ Expected: PASS (4 tests)
 
 - [ ] **Step 5: Write `src/client/transport.ts`**
 
-Lines 4–18 of the old `subscribe.ts`, verbatim:
+Lines 4–22 of the old `subscribe.ts`, verbatim:
 
 ```ts
 import type { GraphQLFormattedError } from './errors.js';
@@ -1581,7 +1577,7 @@ export interface SubscriptionTransport {
 
 - [ ] **Step 6: Write `src/client/sse-transport.ts`**
 
-Lines 20–94 of the old `subscribe.ts`, with `SseTransportOptions.headers` switched to `HeadersSource` and the header block routed through the Task 8 helpers. Every existing comment carries over unchanged.
+Lines 24–98 of the old `subscribe.ts`, with `SseTransportOptions.headers` switched to `HeadersSource` and the header block routed through the Task 8 helpers. Every existing comment carries over unchanged.
 
 ```ts
 import { BuildQLHttpError } from './errors.js';
@@ -1666,7 +1662,9 @@ export function sseTransport(opts: SseTransportOptions): SubscriptionTransport {
 
 - [ ] **Step 7: Write `src/client/ws-transport.ts`**
 
-The protocol logic is unchanged — every comment on lines 106–189 of the old file carries over verbatim. The difference is that `queue`/`done`/`failure`/`wake` and the 12-line async iterator at the end are replaced by one `AsyncQueue`. `completed` and `aborted` stay: they are graphql-ws protocol state, not queue state.
+The protocol logic is unchanged — every comment on lines 107–191 of the old file carries over verbatim. The difference is that `queue`/`done`/`failure`/`wake` and the 12-line async iterator at the end are replaced by one `AsyncQueue`. `completed` and `aborted` stay: they are graphql-ws protocol state, not queue state.
+
+Task 1's plan text said to carry an `@typescript-eslint/no-misused-promises` disable across from `subscribe.ts`; Task 1 as landed never added one because the rule does not fire on `WebSocket.onopen` (typed `=> any`, not `=> void`). Do not add it here — `reportUnusedDisableDirectives` is `warn` and `npm run lint` uses `--max-warnings 0`, so an unused directive fails Step 10.
 
 ```ts
 import { AsyncQueue } from './async-queue.js';
@@ -1697,8 +1695,6 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
       const socket = new WS(opts.url, 'graphql-transport-ws');
       const id = '1';
 
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises -- the async
-      // body is deliberate; see the comment inside about routing throws to the queue.
       socket.onopen = async () => {
         try {
           const params =
@@ -1796,7 +1792,7 @@ git commit -m "refactor(client): split sse/ws transports, extract AsyncQueue fro
 
 ### Task 10: Dedupe the adapters
 
-`toApolloQuery`, `toApolloMutation`, and `toUrqlArgs` each open-code the same two lines of variable defaulting. Both adapters also re-export `TypedDocumentNode` separately.
+`toApolloQuery`, `toApolloMutation`, and `toUrqlArgs` each open-code the same two lines of variable defaulting.
 
 **Files:**
 
@@ -1808,6 +1804,8 @@ git commit -m "refactor(client): split sse/ws transports, extract AsyncQueue fro
 
 - Consumes: Task 4's type names
 - Produces: `src/adapters/document.ts` additionally exports `variablesOf<V>(rest: VarsArg<V>): V`.
+
+**Deliberate non-change:** both adapters keep their own `export type { TypedDocumentNode } from './document.js';`. `src/adapters/document.ts` is not a public entry point — `package.json` `exports`/`typesVersions` list only `./adapters/apollo` and `./adapters/urql`, and `tsup.config.ts` has no `src/adapters/document.ts` entry — so the two re-exports are the only way consumers of either entry point can name the type. Collapsing them would mean shipping a third entry point or breaking the public API; neither is in scope here.
 
 - [ ] **Step 1: Add `variablesOf` to `document.ts`**
 
@@ -1904,7 +1902,7 @@ git commit -m "refactor(adapters): share variable defaulting via variablesOf"
 
 - [ ] **Step 1: Create `src/codegen/ts-types.ts`**
 
-Move lines 55–104 and 141–175 of `emit.ts` verbatim — every comment on `scalarTsType`, `inputTsType`, `typenameTsType`, and `unmappedScalars` is load-bearing and carries over unchanged.
+Move lines 55–98, 142–156, and 164–176 of `emit.ts` verbatim — every comment on `scalarTsType`, `inputTsType`, `typenameTsType`, and `unmappedScalars` is load-bearing and carries over unchanged. Leave `argSpec` (100–105) and `emitTypeMap` (158–162) behind: both are emitters that stay in `emit.ts`. The code block below is authoritative; if the line numbers have drifted, move exactly the six functions it contains.
 
 ```ts
 import type { IRField, IRSchema, IRType, IRTypeRef } from './ir.js';
@@ -2031,7 +2029,7 @@ git commit -m "refactor(codegen): split TypeScript type mapping out of the emitt
 
 `src/cli/index.ts` does five things: resolves paths and runs the codegen pipeline, writes progress to `process.stdout`/`process.stderr`, parses argv, decides whether it is the process entrypoint, and — at module scope — invokes itself. The console coupling is why `test/unit/cli.test.ts` installs global `process.stdout.write` spies in `beforeEach` just to keep test output clean.
 
-`isEntrypoint` exists **only** because `generate`/`main` share a file with the module-scope invocation. Once the invocation lives alone in `bin.ts`, which nothing imports, the guard has no condition left to get wrong and is deleted along with its five tests. Its real guarantee — that the installed binary actually runs — moves to a CI smoke check against the built artifact, which is stronger than a unit test of the predicate.
+`isEntrypoint` exists **only** because `generate`/`main` share a file with the module-scope invocation. Once the invocation lives alone in `bin.ts`, which nothing imports, the guard has no condition left to get wrong and is deleted along with its four tests. Its real guarantee — that the installed binary actually runs — moves to a CI smoke check against the built artifact, which is stronger than a unit test of the predicate.
 
 **Files:**
 
@@ -2041,6 +2039,8 @@ git commit -m "refactor(codegen): split TypeScript type mapping out of the emitt
 - Create: `src/cli/bin.ts`
 - Delete: `src/cli/index.ts`
 - Modify: `package.json` (`bin`, `sideEffects`)
+- Modify: `package-lock.json` (the root `bin` mirror)
+- Modify: `src/cli/config.ts` (the `loadConfig` seam comment naming `cli/index.ts`)
 - Modify: `tsup.config.ts`
 - Modify: `.github/workflows/ci.yml`
 - Modify: `test/unit/cli.test.ts`, `test/e2e/generate-and-run.test.ts`
@@ -2052,20 +2052,23 @@ git commit -m "refactor(codegen): split TypeScript type mapping out of the emitt
 
 - [ ] **Step 1: Write the failing test**
 
-Replace the five `isEntrypoint` tests at the bottom of `test/unit/cli.test.ts` with this, and change the import on line 6 to `import { generate } from '../../src/cli/generate.js';` plus `import { main } from '../../src/cli/main.js';` and `import { collectingReporter } from '../../src/cli/reporter.js';`:
+Replace the four `isEntrypoint` tests at the bottom of `test/unit/cli.test.ts` (`test/unit/cli.test.ts:136-173`, starting at the ``// The CLI only calls `main()` when...`` comment) with this, and change the import on line 6 to `import { generate } from '../../src/cli/generate.js';` plus `import { main } from '../../src/cli/main.js';` and `import { collectingReporter } from '../../src/cli/reporter.js';`:
 
 ```ts
 it('reports unmapped scalars through the injected reporter, not the console', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
-  await copyFile(sdlPath, join(dir, 'schema.graphql'));
+  await writeFile(join(dir, 'schema.graphql'), 'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n');
   const reporter = collectingReporter();
 
   await generate({ schema: './schema.graphql', output: '.' }, dir, reporter);
 
   expect(reporter.warns.join('\n')).toContain('unmapped custom scalar');
+  expect(reporter.warns.join('\n')).toContain('DateTime');
   expect(written(stderrSpy)).toBe('');
 });
 ```
+
+(`writeFile` is already imported at `test/unit/cli.test.ts:2`; `sdlPath`/`copyFile` stay in use by the other tests.)
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -2202,7 +2205,7 @@ export async function main(argv: string[], reporter: Reporter = consoleReporter)
   }
 
   const flagIndex = argv.indexOf('--config');
-  const cwd = flagIndex !== -1 && argv[flagIndex + 1] ? resolve(argv[flagIndex + 1]!) : process.cwd();
+  const cwd = flagIndex !== -1 && argv[flagIndex + 1] ? resolve(argv[flagIndex + 1]) : process.cwd();
 
   try {
     const { config, path } = await loadConfig(cwd);
@@ -2242,6 +2245,8 @@ Then remove the old module:
 git rm src/cli/index.ts
 ```
 
+The `loadConfig` seam comment at `src/cli/config.ts:116` names the now-deleted module — change `` `cli/index.ts` calls `loadConfig(cwd)` `` to `` `cli/main.ts` calls `loadConfig(cwd)` ``.
+
 - [ ] **Step 7: Repoint the package binary and declare the side effect**
 
 In `package.json`:
@@ -2251,6 +2256,8 @@ In `package.json`:
     "buildql": "./dist/cli/bin.js"
   },
 ```
+
+Then resync the lockfile's copy of the same field: `npm install --package-lock-only`
 
 and replace `"sideEffects": false` — which is now false in the literal sense, since `bin.js` runs `main()` on import — with an explicit exception:
 
@@ -2311,7 +2318,7 @@ Run: `npm run check`
 Expected: PASS
 
 ```bash
-git add -A src test package.json tsup.config.ts .github/workflows/ci.yml
+git add -A src test package.json package-lock.json tsup.config.ts .github/workflows/ci.yml
 git commit -m "refactor(cli): split generate/main/bin and inject a reporter port"
 ```
 
@@ -2432,7 +2439,11 @@ A file that grows past ~200 lines or acquires a second reason to change gets spl
 **Types** are PascalCase and spell out the concept. Avoid abbreviations that only make
 sense from inside the file — `FieldSelection`, not `Sel`.
 
-**Errors** all extend `BuildQLError`, and every message starts with `buildql: `.
+**Errors.** Every thrown message starts with `buildql: `. Most call sites throw a plain
+`Error` with that prefix; the client's typed errors (`BuildQLHttpError`,
+`BuildQLResponseError`) extend the exported `BuildQLError` base so consumers can catch
+them with one `instanceof`. Adding a new error _class_ means extending `BuildQLError`;
+a one-off `throw new Error('buildql: ...')` elsewhere in `src/` is fine as is.
 
 **Casts.** `any` is banned. `unknown` plus a documented cast is the house style — every
 `as unknown as` must say what type parameter it is attaching and why the value cannot
@@ -2486,7 +2497,7 @@ Output positions are unaffected: `Apply<W, T>` in `src/types/wrap.ts` is a type-
 
 Note the nullable-element branch already parenthesises (`(${out} | null)[]`); only the non-null branch forgot.
 
-**Runs after Task 11**, which moves this function from `src/codegen/emit.ts` to `src/codegen/ts-types.ts`. If Task 11 has not run, apply the change in `emit.ts` instead — the function body is identical.
+**Runs after Task 11**, which moves this function from `src/codegen/emit.ts` to `src/codegen/ts-types.ts`. If Task 11 has not run, apply the change in `emit.ts` instead — the function body is identical. In that mode also (a) add `export` to `inputTsType` in `emit.ts` (it is currently module-private), (b) change Step 1's import to `import { inputTsType } from '../../src/codegen/emit.js';` and name the test file `test/unit/emit-input-ts-type.test.ts` (adjusting the Step 2/4 vitest paths to match), and (c) use `git add src/codegen/emit.ts test/unit/emit-input-ts-type.test.ts` in Step 6.
 
 **Files:**
 
@@ -2562,7 +2573,7 @@ it('still nests lists correctly once the base is parenthesised', () => {
 - [ ] **Step 2: Run the tests to verify they fail**
 
 Run: `npx vitest run test/unit/ts-types.test.ts`
-Expected: FAIL — the first test reports `string | number[] | null`, the second `(a: string) => void[] | null`. The third and fourth should already pass; if the third fails, the fix in Step 3 has introduced cosmetic churn and existing emitter snapshots will break too.
+Expected: FAIL — the first test reports `string | number[] | null`, the second `(a: string) => void[] | null`, and the fourth `string | number[][] | null` (three failures in all). Only the third should already pass; if it fails, the fix in Step 3 has introduced cosmetic churn and existing emitter snapshots will break too.
 
 - [ ] **Step 3: Parenthesise the base when it does not bind tightly enough**
 
