@@ -44,6 +44,9 @@ re-exported from it, so everyday code only needs that one import.
 npm i buildql
 ```
 
+Contributing? See [CONTRIBUTING.md](./CONTRIBUTING.md) for the naming and
+type-performance conventions the linter enforces.
+
 ## Configure
 
 Create `buildql.config.mjs` — this works on **every** supported Node version,
