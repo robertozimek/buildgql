@@ -1,0 +1,5 @@
+dist
+node_modules
+test/perf/generated.ts
+test/perf/tsconfig.json
+package-lock.json

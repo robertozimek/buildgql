@@ -135,6 +135,9 @@ class FakeWebSocket extends EventTarget implements WebSocket {
   }
 
   send(data: string | ArrayBufferLike | Blob | ArrayBufferView): void {
+    // `send`'s signature mirrors the real `WebSocket.send`; in practice the client only
+    // ever sends the JSON strings it builds itself, never the binary variants in the union.
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
     this.sent.push(String(data));
   }
 

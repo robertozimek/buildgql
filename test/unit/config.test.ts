@@ -100,6 +100,10 @@ describe('loadConfig', () => {
    * real dynamic `import()` against the real filesystem.
    */
   function importModuleThrowingFor(brokenPath: string, err: unknown): ConfigImporter {
+    // `err` is deliberately not always an `Error`; see the doc comment above about
+    // reproducing the real, non-`Error`-shaped rejections Node and Vitest's transform
+    // pipeline throw.
+    // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
     return (url) => (url === pathToFileURL(brokenPath).href ? Promise.reject(err) : import(url));
   }
 

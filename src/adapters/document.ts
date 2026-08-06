@@ -35,10 +35,10 @@ const cache = new WeakMap<Operation<unknown, unknown>, DocumentNode>();
 /** The operation's printed document, parsed into a typed GraphQL AST. */
 export function toDocument<R, V>(op: Operation<R, V>): TypedDocumentNode<R, V> {
   const hit = cache.get(op);
-  if (hit) return hit as TypedDocumentNode<R, V>;
+  if (hit) return hit;
   const doc = parse(op.document);
   cache.set(op, doc);
-  return doc as TypedDocumentNode<R, V>;
+  return doc;
 }
 
 /**

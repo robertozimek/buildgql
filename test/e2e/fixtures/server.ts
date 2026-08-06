@@ -66,6 +66,9 @@ export async function startServer(): Promise<{ url: string; stop: () => Promise<
     }),
     logging: false,
   });
+  // graphql-yoga's server instance is a valid `http.createServer` request listener; this
+  // is exactly how Yoga's own docs wire it up, even though its handler resolves asynchronously.
+  // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(yoga);
   await new Promise<void>((r) => server.listen(0, r));
   const { port } = server.address() as AddressInfo;
