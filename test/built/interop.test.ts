@@ -12,7 +12,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const execFileAsync = promisify(execFile);
 
 /**
- * The only suite in this repo that asserts on BUILT output rather than on `src/`.
+ * Asserts on BUILT output rather than on `src/` — as does every file in `test/built/`.
+ * The siblings take the other two angles on the same output: `type-surface.test.ts` locks
+ * the names `dist/index.d.ts` declares, and `declaration-resolution.test.ts` compiles a
+ * real consumer to check WHICH declaration file `exports` hands it.
  *
  * Everything here is invisible to the other suites by construction: bundler config
  * decides it, every unit test imports `src/` directly, and a mistake in
@@ -28,12 +31,25 @@ const repoRoot = new URL('../../', import.meta.url);
 const distDir = fileURLToPath(new URL('dist/', repoRoot));
 const requireDist = createRequire(import.meta.url);
 
+/**
+ * An `exports` subpath maps either to a target string (`"./package.json"`) or to a
+ * condition object whose values are themselves targets — `types` is nested one level in,
+ * under each format condition, because export conditions match in KEY ORDER and a
+ * top-level `types` therefore wins before `require` is ever considered (see
+ * `test/built/declaration-resolution.test.ts`, which pins why).
+ *
+ * Typed recursively rather than as `Record<string, Record<string, string>>`: that flat
+ * type describes only the shape this map used to have, and the assertions below silently
+ * stop reaching the real targets the moment a condition nests.
+ */
+type ExportTarget = string | { readonly [condition: string]: ExportTarget };
+
 const pkg = JSON.parse(readFileSync(new URL('package.json', repoRoot), 'utf8')) as {
   bin: Record<string, string>;
   main: string;
   module: string;
   types: string;
-  exports: Record<string, Record<string, string>>;
+  exports: Record<string, ExportTarget>;
   typesVersions: Record<string, Record<string, string[]>>;
 };
 
@@ -61,10 +77,40 @@ const REQUIRED = [
   'adapters/urql.js',
 ];
 
-/** The absolute built file each `exports` subpath resolves to under one condition. */
+/**
+ * Node's resolution algorithm, minimally: walk a condition object in KEY ORDER and take
+ * the first key that is `default` or one of `conditions`, recursing into nested objects.
+ * Key order is not incidental here — it is the mechanism the `exports` map got wrong.
+ */
+function resolveExport(target: ExportTarget, conditions: readonly string[]): string | undefined {
+  if (typeof target === 'string') return target;
+  for (const [condition, child] of Object.entries(target)) {
+    if (condition !== 'default' && !conditions.includes(condition)) continue;
+    const hit = resolveExport(child, conditions);
+    if (hit !== undefined) return hit;
+  }
+  return undefined;
+}
+
+/** Every `(label, target)` pair under one subpath, however deeply its conditions nest. */
+function flattenTargets(target: ExportTarget, label: string): [string, string][] {
+  if (typeof target === 'string') return [[label, target]];
+  return Object.entries(target).flatMap(([condition, child]) =>
+    flattenTargets(child, `${label}.${condition}`),
+  );
+}
+
+/**
+ * Every `exports` subpath that names a built bundle — i.e. all but the `./package.json`
+ * passthrough, which exists so tooling can read the manifest and is not loadable as a
+ * module under either condition.
+ */
+const BUNDLE_SUBPATHS = Object.keys(pkg.exports).filter((sub) => sub !== './package.json');
+
+/** The absolute built file each bundle subpath resolves to under one condition. */
 function exportsUnder(condition: 'import' | 'require'): [subpath: string, absolute: string][] {
-  return Object.entries(pkg.exports).flatMap(([sub, conds]) => {
-    const rel = conds[condition];
+  return BUNDLE_SUBPATHS.flatMap((sub) => {
+    const rel = resolveExport(pkg.exports[sub], [condition]);
     return rel ? [[sub, fileURLToPath(new URL(rel, repoRoot))] as [string, string]] : [];
   });
 }
@@ -135,22 +181,57 @@ describe('published entry points', () => {
       ['main', pkg.main],
       ['module', pkg.module],
       ['types', pkg.types],
-      ...Object.entries(pkg.exports).flatMap(([sub, conds]) =>
-        Object.entries(conds).map(([cond, p]): [string, string] => [`exports["${sub}"].${cond}`, p]),
-      ),
+      ...Object.entries(pkg.exports).flatMap(([sub, target]) => flattenTargets(target, `exports["${sub}"]`)),
       ...Object.entries(pkg.typesVersions['*'] ?? {}).flatMap(([sub, paths]) =>
         paths.map((p): [string, string] => [`typesVersions["${sub}"]`, p]),
       ),
     ];
 
-    expect(declared.length).toBeGreaterThan(0);
+    // Pinned as an exact count, not just `> 0`: `flattenTargets` walks a recursive shape,
+    // and a walker that stopped one level short would still return a non-empty list —
+    // exactly the silent under-checking that the old one-level flatten did once `types`
+    // moved inside the format conditions. 5 subpaths x 2 conditions x 2 keys, plus the
+    // `./package.json` passthrough, plus bin/main/module/types and 4 typesVersions entries.
+    expect(declared.length).toBe(29);
     const missing = declared.filter(([, p]) => !existsSync(fileURLToPath(new URL(p, repoRoot))));
     expect(missing).toEqual([]);
+  });
+
+  it('nests `types` inside each format condition, pointing require at the .d.cts', () => {
+    // The declaration a consumer actually gets is decided here and nowhere else.
+    // `test/built/declaration-resolution.test.ts` proves the resulting map compiles;
+    // this states the invariant in one line so a regression is legible rather than
+    // arriving as a wall of TS1479s.
+    for (const sub of BUNDLE_SUBPATHS) {
+      const target = pkg.exports[sub];
+      // TypeScript's condition set always contains `types`, so a `types` key ABOVE the
+      // format conditions matches first and hands CJS consumers the ESM declarations.
+      expect(resolveExport(target, ['require', 'types']), `exports["${sub}"].require.types`).toMatch(
+        /\.d\.cts$/,
+      );
+      // `.d.cts` does not end in `.d.ts`, so this excludes it without a lookbehind.
+      expect(resolveExport(target, ['import', 'types']), `exports["${sub}"].import.types`).toMatch(
+        /\.d\.ts$/,
+      );
+    }
   });
 
   it('keeps the shebang on the CLI binary that `bin` points at', () => {
     const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
     expect(readFileSync(bin, 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
+  });
+
+  it('ships no CJS or declaration build of the CLI binary, which nothing can reach', () => {
+    // `bin` names exactly one file and npm invokes that path directly; `bin.ts` has no
+    // `exports` subpath, so `require('buildql/bin')` fails with ERR_PACKAGE_PATH_NOT_EXPORTED
+    // whatever is on disk. A `bin.cjs` therefore had no possible caller, and `bin.ts`
+    // exports nothing, so its declarations were a file containing only the shebang line.
+    // All three shipped in the tarball anyway until `tsup.config.ts` gave `bin.ts` its own
+    // ESM-only, `dts: false` config — asserted here so a config change cannot quietly
+    // reinstate dead weight in the published package.
+    for (const dead of ['cli/bin.cjs', 'cli/bin.d.ts', 'cli/bin.d.cts']) {
+      expect(existsSync(`${distDir}${dead}`), `dist/${dead} is published but unreachable`).toBe(false);
+    }
   });
 
   // Existence is not loadability. `splitting: true` rewrites the CJS bundles through
@@ -159,7 +240,7 @@ describe('published entry points', () => {
 
   it('loads every CJS bundle named in exports.require', () => {
     const entries = exportsUnder('require');
-    expect(entries.length).toBe(Object.keys(pkg.exports).length);
+    expect(entries.length).toBe(BUNDLE_SUBPATHS.length);
     for (const [sub, abs] of entries) {
       const mod = requireDist(abs) as Record<string, unknown>;
       expect(Object.keys(mod).length, `buildql${sub.slice(1)} loaded but exported nothing`).toBeGreaterThan(
@@ -170,7 +251,7 @@ describe('published entry points', () => {
 
   it('loads every ESM bundle named in exports.import', async () => {
     const entries = exportsUnder('import');
-    expect(entries.length).toBe(Object.keys(pkg.exports).length);
+    expect(entries.length).toBe(BUNDLE_SUBPATHS.length);
     for (const [sub, abs] of entries) {
       const mod = (await import(pathToFileURL(abs).href)) as Record<string, unknown>;
       expect(Object.keys(mod).length, `${sub} loaded but exported nothing`).toBeGreaterThan(0);
