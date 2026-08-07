@@ -2,7 +2,7 @@ import { execFile } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -286,6 +286,88 @@ describe('published entry points', () => {
   it('exits nonzero when the command fails, not just zero when it succeeds', async () => {
     const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
     await expect(execFileAsync(process.execPath, [bin, 'bogus'])).rejects.toMatchObject({ code: 1 });
+  });
+});
+
+describe('the optional `graphql` peer dependency stays out of the core entries', () => {
+  // `graphql` is an OPTIONAL peer dependency. Only `src/adapters/**`, `src/codegen/**` and
+  // `src/cli/**` may reach it — `src/index.ts`, `src/client/**`, `src/runtime/**` and
+  // `src/types/**` must not, at type level or runtime. If that ever breaks, a consumer who
+  // did not install `graphql` gets ERR_MODULE_NOT_FOUND on the package's MAIN entry point:
+  // the most severe consumer-facing failure this library has.
+  //
+  // The boundary was intact when this test was written and held only by manual grep — no
+  // test and no lint rule enforced it. It is also invisible to every `src/`-level suite,
+  // which resolves `graphql` from this repo's own devDependencies and so cannot tell an
+  // imported one from an absent one. `eslint.config.js` now carries a `no-restricted-imports`
+  // rule over the same four directories as cheap defence in depth; this is the check that
+  // sees what actually shipped.
+
+  /** `from 'graphql'`, `import('graphql')`, `import 'graphql'`, `require('graphql')`, deep paths too. */
+  const GRAPHQL_SPECIFIER = /\b(?:from|import|require)\s*\(?\s*['"]graphql(?:\/[^'"]*)?['"]/;
+  /** The same four forms, but capturing a relative specifier so the graph can be walked. */
+  const RELATIVE_SPECIFIER = /\b(?:from|import|require)\s*\(?\s*['"](\.[^'"]*)['"]/g;
+
+  const CORE_SUBPATHS = ['.', './client', './config'];
+
+  /**
+   * The entry file plus every built file it reaches through a relative specifier.
+   *
+   * Following the graph is the whole point. tsup code-splits the entry group containing
+   * `.` and `./client`, so almost all of their code lives in a `chunk-*.js` / `chunk-*.cjs`
+   * that the entry merely re-exports. A check that read only the entry files would report
+   * a clean boundary while the leak shipped inside the chunk — a guard that exists and
+   * does nothing.
+   */
+  function reachableFrom(entry: string): Map<string, string> {
+    const seen = new Map<string, string>();
+    const walk = (file: string): void => {
+      if (seen.has(file) || !existsSync(file)) return;
+      const source = readFileSync(file, 'utf8');
+      seen.set(file, source);
+      for (const match of source.matchAll(RELATIVE_SPECIFIER)) walk(resolve(dirname(file), match[1]));
+    };
+    walk(entry);
+    return seen;
+  }
+
+  function coreEntries(condition: 'import' | 'require'): [subpath: string, absolute: string][] {
+    const entries = exportsUnder(condition).filter(([sub]) => CORE_SUBPATHS.includes(sub));
+    // Asserted, not assumed: renaming a subpath would otherwise reduce this whole describe
+    // block to a loop over nothing that still reports as passing.
+    expect(entries.map(([sub]) => sub)).toEqual(CORE_SUBPATHS);
+    return entries;
+  }
+
+  it.each(['import', 'require'] as const)(
+    'is absent from every %s bundle and from every chunk it reaches',
+    (condition) => {
+      for (const [sub, abs] of coreEntries(condition)) {
+        for (const [file, source] of reachableFrom(abs)) {
+          expect(
+            source,
+            `buildql${sub.slice(1)} reaches ${relative(distDir, file)}, which imports graphql`,
+          ).not.toMatch(GRAPHQL_SPECIFIER);
+        }
+      }
+    },
+  );
+
+  it('walks past the entry file into the shared chunk', () => {
+    // Without this, the two assertions above could quietly degrade to an entry-file-only
+    // grep — they would still pass, while a leak inside `chunk-*` shipped unseen. Both
+    // formats are named because CJS splitting is opt-in (`splitting: true` in
+    // tsup.config.ts): if it were dropped, the CJS entries would stop having a chunk to
+    // walk into and this states that expectation out loud rather than degrading silently.
+    for (const condition of ['import', 'require'] as const) {
+      for (const [sub, abs] of coreEntries(condition).filter(([s]) => s !== './config')) {
+        const reached = [...reachableFrom(abs).keys()].map((f) => relative(distDir, f));
+        expect(
+          reached.some((f) => f.startsWith('chunk-')),
+          `${sub} under ${condition}: ${reached.join(', ')}`,
+        ).toBe(true);
+      }
+    }
   });
 });
 

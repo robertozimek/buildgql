@@ -80,6 +80,39 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-unnecessary-type-assertion': 'off' },
   },
   {
+    // `graphql` is an OPTIONAL peer dependency. Only `src/adapters/**`, `src/codegen/**`
+    // and `src/cli/**` may import it; the package's main entry and everything it reaches
+    // must not, or a consumer who did not install `graphql` gets ERR_MODULE_NOT_FOUND on
+    // `import 'buildql'` itself. This repo has `graphql` in its own devDependencies, so
+    // nothing about a `src/`-level type-check or unit test would notice.
+    //
+    // The TYPE-CHECKED variant of the rule, not the base one: `import type { DocumentNode }
+    // from 'graphql'` is erased at runtime but still lands in the emitted `.d.ts`, so a
+    // consumer without the package gets a compile error instead of a load error. Both are
+    // the boundary being broken, and `allowTypeImports` is left off for that reason.
+    //
+    // Defence in depth only. The rule reads `src/`; what ships is `dist/`, and bundling can
+    // pull a leak in through a shared chunk from a directory this rule does not cover. The
+    // enforcing check is `test/built/interop.test.ts`, which greps the built entries and
+    // every chunk they reach.
+    files: ['src/index.ts', 'src/client/**/*.ts', 'src/runtime/**/*.ts', 'src/types/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['graphql', 'graphql/*'],
+              message:
+                'graphql is an optional peer dependency: only src/adapters, src/codegen and src/cli may import it. ' +
+                'Importing it here breaks `import "buildql"` for every consumer who did not install graphql.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['test/**/*.ts'],
     rules: {
       // Type tests assert on unused locals and deliberately-wrong calls.
