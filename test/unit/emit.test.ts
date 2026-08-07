@@ -176,6 +176,163 @@ describe('emit', () => {
     expect(src).not.toContain("objectFieldArgs('avatar'");
   });
 
+  it('emits an interface per input object and binds the subscription root', () => {
+    // Built by hand for the same reason as the `leafFieldArgs` test above, and it is the
+    // same hole: before this test, `emitInput` was never CALLED at all. Neither
+    // `test/fixtures/schema.graphql` nor the e2e server declares an input object or a
+    // subscription root, so `grep -rn "kind: 'input'" test/` and every `subscriptionType`
+    // in `test/` came back empty and null respectively — a typo confined to either of
+    // those two template literals kept `npm run check` fully green while every consumer
+    // with an input object or a subscription got a broken generated module.
+    //
+    // Deliberately NOT added to the shared SDL fixture: `test/unit/cli.test.ts` and the
+    // e2e suite both pin that file's contents.
+    const schema: IRSchema = {
+      queryType: 'Query',
+      mutationType: null,
+      subscriptionType: 'Subscription',
+      scalars: DEFAULT_SCALARS,
+      types: [
+        {
+          name: 'Query',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'posts',
+              type: { wrap: ['!', 'l', '!'], name: 'Post', kind: 'object' },
+              gqlType: '[Post!]!',
+              description: null,
+              deprecated: null,
+              args: [
+                {
+                  name: 'filter',
+                  type: { wrap: [], name: 'PostFilter', kind: 'input' },
+                  gqlType: 'PostFilter',
+                  optional: true,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          name: 'Subscription',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'postAdded',
+              type: { wrap: ['!'], name: 'Post', kind: 'object' },
+              gqlType: 'Post!',
+              description: null,
+              deprecated: null,
+              args: [],
+            },
+          ],
+        },
+        {
+          name: 'Post',
+          kind: 'object',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          inputFields: [],
+          fields: [
+            {
+              name: 'id',
+              type: { wrap: ['!'], name: 'ID', kind: 'scalar' },
+              gqlType: 'ID!',
+              description: null,
+              deprecated: null,
+              args: [],
+            },
+          ],
+        },
+        {
+          // One required scalar, one OPTIONAL field, one LIST field, and one reference to
+          // another input object — between them these cover every branch `emitInput` and
+          // the `inputTsType` it calls can take on a field.
+          name: 'PostFilter',
+          kind: 'input',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          fields: [],
+          inputFields: [
+            {
+              name: 'title',
+              type: { wrap: ['!'], name: 'String', kind: 'scalar' },
+              gqlType: 'String!',
+              optional: false,
+            },
+            {
+              name: 'tags',
+              type: { wrap: ['l', '!'], name: 'String', kind: 'scalar' },
+              gqlType: '[String!]',
+              optional: true,
+            },
+            {
+              name: 'author',
+              type: { wrap: ['!'], name: 'AuthorFilter', kind: 'input' },
+              gqlType: 'AuthorFilter!',
+              optional: false,
+            },
+          ],
+        },
+        {
+          name: 'AuthorFilter',
+          kind: 'input',
+          description: null,
+          possibleTypes: [],
+          interfaces: [],
+          enumValues: [],
+          fields: [],
+          inputFields: [
+            {
+              name: 'name',
+              type: { wrap: [], name: 'String', kind: 'scalar' },
+              gqlType: 'String',
+              optional: true,
+            },
+          ],
+        },
+      ],
+    };
+    const src = emit(schema);
+
+    // Pinned as whole blocks, not line fragments: the `export interface` keyword, the type
+    // name, every field name, the `?` optional marker and each mapped TypeScript type all
+    // come from one template literal in `emitInput`, so any typo inside it fails here.
+    expect(src).toContain(
+      'export interface PostFilter {\n  title: string;\n  tags?: string[] | null;\n  author: AuthorFilter;\n}\n',
+    );
+    expect(src).toContain('export interface AuthorFilter {\n  name?: string | null;\n}\n');
+
+    // The interface must be the same name the argument type refers to — emitting a correct
+    // interface under a name nothing references would still be a broken module.
+    expect(src).toContain(
+      "  get posts() { return objectFieldArgs('posts', ['!', 'l', '!'], Post, argSpec<{ filter?: PostFilter | null }>({ filter: 'PostFilter' })) },",
+    );
+
+    // An input object is not composite: it gets an interface and nothing else — no field
+    // map, and no fragment helper (a fragment on an input type is not valid GraphQL).
+    expect(src).not.toContain('export const PostFilter = {');
+    expect(src).not.toContain("makeFragment('PostFilter'");
+
+    // The subscription root binding, which no fixture in this repo has a schema for.
+    expect(src).toContain('export const subscription = makeSubscription(Subscription);');
+  });
+
   it('falls back to `unknown` for an unmapped scalar named "valueOf", rather than splicing in the inherited Object.prototype member', () => {
     // Regression test for leafTsType/inputTsType: `ir.scalars` here is a plain object
     // (`DEFAULT_SCALARS` inherits from `Object.prototype`), so a bracket read of
