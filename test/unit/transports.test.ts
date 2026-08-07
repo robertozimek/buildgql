@@ -120,6 +120,28 @@ it('throws instead of completing silently when an SSE stream ends mid-event', as
 });
 
 /**
+ * Node exposes `CloseEvent` as a global only from v23 on, but `engines` declares a
+ * Node 18 floor and CI runs 20 — so constructing the global directly passes on a
+ * modern dev machine and throws `ReferenceError` on every supported version. This
+ * subclasses `Event` (global since Node 15) to implement the interface for real
+ * rather than casting, matching `FakeWebSocket` below. `wsTransport`'s `onclose`
+ * takes no argument at all, so the fields exist to satisfy the interface that
+ * `WebSocket.onclose` is declared against, not because anything reads them.
+ */
+class FakeCloseEvent extends Event implements CloseEvent {
+  readonly code: number;
+  readonly reason: string;
+  readonly wasClean: boolean;
+
+  constructor(type: string, init: CloseEventInit = {}) {
+    super(type, init);
+    this.code = init.code ?? 0;
+    this.reason = init.reason ?? '';
+    this.wasClean = init.wasClean ?? false;
+  }
+}
+
+/**
  * Minimal fake implementing the full `WebSocket` interface (not a cast) so the
  * `graphql-ws` transport — which is constructed against `typeof WebSocket` — can
  * be driven deterministically: assign `.onopen`/`.onmessage` and call them by
@@ -280,7 +302,7 @@ it('throws when the WS socket closes without a complete message (abnormal close)
 
   // The socket goes away (network drop, code 1006) without ever sending `complete`.
   const second = iterator.next();
-  socket.onclose?.call(socket, new CloseEvent('close', { code: 1006, wasClean: false }));
+  socket.onclose?.call(socket, new FakeCloseEvent('close', { code: 1006, wasClean: false }));
   await expect(second).rejects.toThrow('buildql: subscription stream ended before completing');
 });
 
@@ -305,7 +327,7 @@ it('keeps the first WS failure when an abnormal close follows a socket error', a
   // the old inline `onclose` actually mattered. `onerror` had never fired in this suite
   // before this test.
   socket.onerror?.call(socket, new Event('error'));
-  socket.onclose?.call(socket, new CloseEvent('close', { code: 1006, wasClean: false }));
+  socket.onclose?.call(socket, new FakeCloseEvent('close', { code: 1006, wasClean: false }));
 
   await expect(first).rejects.toThrow('buildql: subscription socket error');
 });
