@@ -9,6 +9,16 @@ export interface GraphQLFormattedError {
  * Base class for every error buildql throws from the client. Exists so consumers can
  * write one `catch (e) { if (e instanceof BuildQLError) ... }` instead of enumerating
  * subclasses — and so adding a subclass later does not break that check.
+ *
+ * That `instanceof` holds for an error obtained from `buildql` and one thrown through
+ * `buildql/client`, in ESM and in CJS alike: both entries reach a single copy of this
+ * class through a shared chunk (`splitting: true` in `tsup.config.ts`), pinned by
+ * `test/built/interop.test.ts`.
+ *
+ * It cannot hold across a consumer that loads BOTH the ESM and the CJS build of this
+ * package — two module instances, two class objects, and `instanceof` is false between
+ * them. That is inherent to dual publishing rather than a defect here, and no packaging
+ * change can close it; a consumer in that position must compare `error.name` instead.
  */
 export abstract class BuildQLError extends Error {}
 

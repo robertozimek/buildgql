@@ -24,12 +24,18 @@ export interface TypedDocumentNode<R, V> extends DocumentNode {
  * freshly parsed node on every call would defeat caching and re-trigger network requests
  * on every render. A `WeakMap` keeps this from pinning operations that go out of scope.
  *
- * Only per-adapter identity is a contract (each of `apolloDocument`/`urqlDocument` returns
- * the same node across calls for the same operation) — tsup code-splits the ESM build so
- * both adapters share one `WeakMap` via a common chunk, but not the CJS build, where
- * `dist/adapters/apollo.cjs` and `dist/adapters/urql.cjs` each get their own module instance
- * and therefore their own cache. `apolloDocument(op) !== urqlDocument(op)` under `require`
- * as a result; do not rely on cross-adapter document identity.
+ * Only per-adapter identity is a contract: each of `apolloDocument`/`urqlDocument` returns
+ * the same node across calls for the same operation, and that is all a caller may rely on.
+ *
+ * Cross-adapter identity — `apolloDocument(op) === urqlDocument(op)` — is a deliberate
+ * NON-guarantee, not a claim either way. As shipped it happens to hold in both formats:
+ * `tsup.config.ts` sets `splitting: true` on the entry group holding both adapters, so
+ * `dist/adapters/{apollo,urql}.js` share one chunk and `dist/adapters/{apollo,urql}.cjs`
+ * share another, leaving exactly one `WeakMap` instance per format. That is a property of
+ * the current bundling rather than a promise: it would stop holding under a different
+ * `splitting` setting, a consumer bundler that duplicated the chunk, or an install that
+ * mixed the ESM and CJS copies of the package. Nothing here is designed to keep it true,
+ * and no test pins it.
  */
 const cache = new WeakMap<Operation<unknown, unknown>, DocumentNode>();
 
