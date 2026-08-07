@@ -8,6 +8,10 @@ export default tseslint.config(
     ignores: [
       'dist/**',
       'node_modules/**',
+      // `npm pack` extracted here while verifying the published tarball. Not tracked
+      // (see .gitignore) but a stray local extract still breaks lint by walking
+      // TypeScript into files outside the project service.
+      'package/**',
       // Machine-written.
       'test/perf/generated.ts',
       'test/perf/tsconfig.json',

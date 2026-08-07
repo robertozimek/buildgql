@@ -12,9 +12,14 @@ import * as ts from 'typescript';
  * under `test/`. Deleting `export type { HeadersSource }` — a name Task 8 deliberately
  * added — passed the entire test suite before this file existed.
  *
- * Runs against `dist/index.d.ts`, the file `package.json`'s `exports["."].types` actually
- * points consumers at, rather than `src/index.ts`. That file re-exports through
- * content-hashed, single-letter-aliased chunk files —
+ * Runs against `dist/index.d.ts`, the file `package.json`'s `exports["."].import.types`
+ * points ESM consumers at, rather than `src/index.ts`. There is no bare `exports["."].types`
+ * — `types` is nested inside each of the `import`/`require` conditions, and CJS consumers
+ * are pointed at `dist/index.d.cts` instead. That second file is not asserted on separately:
+ * both declarations are emitted by tsup from the same `src/index.ts` in one build step, so
+ * they cannot realistically drift, and pinning the ESM one is enough to catch a regression
+ * in the export list itself. `dist/index.d.ts` re-exports through content-hashed,
+ * single-letter-aliased chunk files —
  *
  *   export { k as AnyFieldSelection, l as Arg, ... } from './operation-DxbEION8.js';
  *
