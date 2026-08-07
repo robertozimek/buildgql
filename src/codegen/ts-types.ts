@@ -37,16 +37,28 @@ export function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
  * once depth returns to 0, is the only way to find a top-level operator that a fixed-shape
  * regex cannot express (a regex has no notion of "matching bracket depth").
  *
+ * `>` needs one exception: a `>` immediately preceded by `=` is the tail of an arrow `=>`,
+ * not the close of a `<...>` this scan opened (arrow functions never open with `<`), so it is
+ * excluded from the closer set below. An earlier version of this scan missed that and
+ * decremented depth for it anyway, which desynchronised every check after the first function
+ * type in the string — e.g. `Record<string, () => void> | string` reached depth 0 one
+ * bracket too early, inside the generic, and its real top-level `|` was never seen.
+ *
  * What this guarantees: every `|`, `&` or top-level `=>` in `type` is found, however deeply
  * other operators are nested inside brackets elsewhere in the string, so `type` is correctly
- * parenthesised before a postfix `[]` is appended.
+ * parenthesised before a postfix `[]` is appended. An unmatched closer (depth going negative)
+ * is treated as non-atomic rather than trusted — parenthesising an already-atomic type is
+ * harmless, whereas guessing atomic for a string this scan can't balance risks reproducing
+ * the wrong-parse bug it exists to prevent.
  *
  * What this does NOT guarantee: this is not a TypeScript parser. It has no notion of string
  * or template literals, comments, or conditional types (`T extends U ? X : Y`), so a scalar
- * mapping containing a quoted `'|'` or unbalanced brackets could still be misclassified.
- * Scalar mappings are short, hand-written raw type expressions from user config
- * (`scalars: { JSON: 'string | number' }`), not arbitrary program source, so that residual
- * gap is accepted rather than built out.
+ * mapping containing a quoted `'|'` could still be misclassified as non-atomic (safe: it only
+ * adds harmless parens) or, in principle, atomic if the quoted content itself balances
+ * brackets in a way that hides a real top-level operator (not safe, but not a shape any
+ * existing test or fixture produces). Scalar mappings are short, hand-written raw type
+ * expressions from user config (`scalars: { JSON: 'string | number' }`), not arbitrary
+ * program source, so that residual gap is accepted rather than built out.
  */
 function isAtomicTypeExpression(type: string): boolean {
   let depth = 0;
@@ -54,8 +66,17 @@ function isAtomicTypeExpression(type: string): boolean {
     const ch = type[i];
     if (ch === '(' || ch === '[' || ch === '{' || ch === '<') {
       depth++;
-    } else if (ch === ')' || ch === ']' || ch === '}' || ch === '>') {
+    } else if (ch === ')' || ch === ']' || ch === '}' || (ch === '>' && type[i - 1] !== '=')) {
+      // A `>` immediately preceded by `=` is the tail of an arrow `=>`, not the close of a
+      // `<...>` this scan opened. Decrementing depth for it desynchronises every check after
+      // it: e.g. `Record<string, () => void> | string` would see depth hit 0 one bracket too
+      // early, inside the generic, and its top-level `|` would then be missed entirely.
       depth--;
+      // An unmatched closer (depth would go negative) means the scan can no longer trust its
+      // own bracket accounting. Fail toward parenthesising — parens around an already-atomic
+      // type are harmless, but silently treating a string the scan can't make sense of as
+      // atomic risks reproducing the exact wrong-parse bug this function exists to prevent.
+      if (depth < 0) return false;
     } else if (depth === 0 && (ch === '|' || ch === '&' || (ch === '=' && type[i + 1] === '>'))) {
       return false;
     }
