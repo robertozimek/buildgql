@@ -1,0 +1,136 @@
+{
+  "name": "buildql",
+  "version": "0.1.0",
+  "description": "Type-safe GraphQL query builder generated from introspection",
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "graphql",
+    "typescript",
+    "codegen",
+    "query-builder",
+    "type-safe"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rozimek/buildql.git"
+  },
+  "sideEffects": [
+    "./dist/cli/bin.js"
+  ],
+  "bin": {
+    "buildql": "./dist/cli/bin.js"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./client": {
+      "import": {
+        "types": "./dist/client/index.d.ts",
+        "default": "./dist/client/index.js"
+      },
+      "require": {
+        "types": "./dist/client/index.d.cts",
+        "default": "./dist/client/index.cjs"
+      }
+    },
+    "./config": {
+      "import": {
+        "types": "./dist/cli/config.d.ts",
+        "default": "./dist/cli/config.js"
+      },
+      "require": {
+        "types": "./dist/cli/config.d.cts",
+        "default": "./dist/cli/config.cjs"
+      }
+    },
+    "./adapters/apollo": {
+      "import": {
+        "types": "./dist/adapters/apollo.d.ts",
+        "default": "./dist/adapters/apollo.js"
+      },
+      "require": {
+        "types": "./dist/adapters/apollo.d.cts",
+        "default": "./dist/adapters/apollo.cjs"
+      }
+    },
+    "./adapters/urql": {
+      "import": {
+        "types": "./dist/adapters/urql.d.ts",
+        "default": "./dist/adapters/urql.js"
+      },
+      "require": {
+        "types": "./dist/adapters/urql.d.cts",
+        "default": "./dist/adapters/urql.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "client": [
+        "./dist/client/index.d.ts"
+      ],
+      "config": [
+        "./dist/cli/config.d.ts"
+      ],
+      "adapters/apollo": [
+        "./dist/adapters/apollo.d.ts"
+      ],
+      "adapters/urql": [
+        "./dist/adapters/urql.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:types": "tsc -p tsconfig.typetest.json && tsc -p test/types/nuia/tsconfig.json",
+    "test:perf": "node scripts/typeperf.mjs",
+    "check": "npm run lint && npm run format:check && npm run test:types && npm run build && npm run test && npm run test:perf"
+  },
+  "peerDependencies": {
+    "graphql": ">=16",
+    "typescript": ">=5.4"
+  },
+  "peerDependenciesMeta": {
+    "graphql": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@graphql-typed-document-node/core": "^3.2.0",
+    "@types/node": "^20.19.43",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "eslint-plugin-unicorn": "^56.0.1",
+    "graphql": "^16.14.2",
+    "graphql-yoga": "^5.21.2",
+    "prettier": "^3.9.6",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^2.1.9"
+  }
+}

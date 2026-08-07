@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "ES2022.Object", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": false,
+    "declaration": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["src", "test"],
+  // `test/types/nuia` compiles only under its own tsconfig, which turns on
+  // `noUncheckedIndexedAccess`. Including it here (the repo default, flag off)
+  // makes editors report a spurious "unused @ts-expect-error" (TS2578).
+  "exclude": ["test/perf", "test/types/nuia"]
+}

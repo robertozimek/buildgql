@@ -1,0 +1,122 @@
+import type {
+  AnyFieldSelection,
+  Directive,
+  FragmentDefinition,
+  FragmentSpread,
+  InlineFragment,
+  SelectionNode,
+  VarRef,
+} from '../types/selection.js';
+import { ENUM, VAR_REF, isEnumValue, isVarRefValue } from './markers.js';
+
+/** GraphQL value literal serialisation. Enum values arrive pre-marked by codegen. */
+function printValue(value: unknown): string {
+  // Order is load-bearing: `Object.entries` (in the generic object branch below) does not
+  // enumerate symbol keys, so once a value reaches that branch its marker brand — if it had
+  // one — is invisible. The marker checks must run first to see it. Under the old string-key
+  // markers a misordering here still printed something visibly wrong (`{__enum: "X"}`); with
+  // symbol keys the same mistake would instead silently print `{}`, losing the value.
+  if (isVarRefValue(value)) return `$${value[VAR_REF]}`;
+  if (value === null || value === undefined) return 'null';
+  if (isEnumValue(value)) return value[ENUM];
+  if (typeof value === 'string') return JSON.stringify(value);
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (Array.isArray(value)) return `[${value.map(printValue).join(', ')}]`;
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .map(([k, v]) => `${k}: ${printValue(v)}`);
+    return `{${entries.join(', ')}}`;
+  }
+  throw new Error(`buildql: cannot serialise argument value of type ${typeof value}`);
+}
+
+function printArgs(argv: Record<string, unknown> | undefined): string {
+  if (!argv) return '';
+  const entries = Object.entries(argv).filter(([, v]) => v !== undefined);
+  if (entries.length === 0) return '';
+  return `(${entries.map(([k, v]) => `${k}: ${printValue(v)}`).join(', ')})`;
+}
+
+function printDirectives(ds: readonly Directive[] | undefined): string {
+  if (!ds || ds.length === 0) return '';
+  return ds
+    .map((d) => {
+      const cond = typeof d.if === 'boolean' ? String(d.if) : `$${d.if.varName}`;
+      return ` @${d.name}(if: ${cond})`;
+    })
+    .join('');
+}
+
+function printNode(n: SelectionNode): string {
+  if (n.kind === 'spread') return `...${(n as FragmentSpread<unknown>).fragment.name}`;
+  if (n.kind === 'on') {
+    const o = n as InlineFragment<string, unknown>;
+    return `... on ${o.typename} ${printSels(o.sels)}`;
+  }
+  const s = n as AnyFieldSelection;
+  const head = s.alias ? `${s.alias}: ${s.name}` : s.name;
+  const body = s.sels && s.sels.length > 0 ? ` ${printSels(s.sels)}` : '';
+  return `${head}${printArgs(s.args)}${printDirectives(s.directives)}${body}`;
+}
+
+function printSels(sels: readonly SelectionNode[]): string {
+  const hasInline = sels.some((n) => n.kind === 'on');
+  const hasTypename = sels.some((n) => n.kind === 'field' && (n as AnyFieldSelection).name === '__typename');
+  const parts = sels.map(printNode);
+  if (hasInline && !hasTypename) parts.unshift('__typename');
+  return `{ ${parts.join(' ')} }`;
+}
+
+/** Walks the whole tree, including inline fragments, spreads and directives. */
+function collectVarRefs(sels: readonly SelectionNode[]): VarRef[] {
+  const out: VarRef[] = [];
+  const walk = (nodes: readonly SelectionNode[]): void => {
+    for (const n of nodes) {
+      if (n.kind === 'on') {
+        walk((n as InlineFragment<string, unknown>).sels);
+        continue;
+      }
+      if (n.kind === 'spread') {
+        walk(n.fragment.sels);
+        continue;
+      }
+      const s = n as AnyFieldSelection;
+      if (s.varRefs) out.push(...s.varRefs);
+      for (const d of s.directives ?? []) {
+        if (typeof d.if !== 'boolean') out.push(d.if);
+      }
+      if (s.sels) walk(s.sels);
+    }
+  };
+  walk(sels);
+  return out;
+}
+
+function dedupeVarRefs(refs: readonly VarRef[]): VarRef[] {
+  const byName = new Map<string, VarRef>();
+  for (const ref of refs) {
+    const seen = byName.get(ref.varName);
+    if (seen && seen.gqlType !== ref.gqlType) {
+      throw new Error(
+        `buildql: variable $${ref.varName} is used with two different types ` +
+          `(${seen.gqlType} and ${ref.gqlType}). Give one of them an explicit name with v('otherName').`,
+      );
+    }
+    if (!seen) byName.set(ref.varName, ref);
+  }
+  return [...byName.values()];
+}
+
+export function printOperation(
+  kind: 'query' | 'mutation' | 'subscription',
+  name: string,
+  sels: readonly SelectionNode[],
+  fragments: readonly FragmentDefinition[] = [],
+): string {
+  const vars = dedupeVarRefs(collectVarRefs(sels));
+  const sig = vars.length > 0 ? `(${vars.map((v) => `$${v.varName}: ${v.gqlType}`).join(', ')})` : '';
+  const op = `${kind} ${name}${sig} ${printSels(sels)}`;
+  const frags = fragments.map((f) => `fragment ${f.name} on ${f.typeCondition} ${printSels(f.sels)}`);
+  return [op, ...frags].join(' ');
+}
