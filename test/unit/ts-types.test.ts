@@ -84,3 +84,24 @@ it("leaves a union nested entirely inside one generic's type argument unparenthe
   const ir = schemaWithScalars({ JSON: 'Array<string | number>' });
   expect(inputTsType(listOfNonNull, ir)).toBe('Array<string | number>[] | null');
 });
+
+// The depth scan above treats `)`, `]`, `}` and `>` as closers. But `=>`'s `>` was never
+// opened by this scan (arrow functions don't open with `<`) — counting it anyway decrements
+// depth for a bracket that doesn't exist, so depth reaches 0 one bracket too early and a real
+// top-level `|`/`&` after a function type goes undetected. These pin that a function type
+// nested inside the union — parenthesised, inside a generic, or bare — doesn't swallow the
+// operator that follows it.
+it('parenthesises a union whose first operand is a parenthesised function type', () => {
+  const ir = schemaWithScalars({ JSON: '((x: string) => number) | string' });
+  expect(inputTsType(listOfNonNull, ir)).toBe('(((x: string) => number) | string)[] | null');
+});
+
+it('parenthesises a union whose first operand is a generic containing a function type', () => {
+  const ir = schemaWithScalars({ JSON: 'Record<string, () => void> | string' });
+  expect(inputTsType(listOfNonNull, ir)).toBe('(Record<string, () => void> | string)[] | null');
+});
+
+it('parenthesises a union whose first operand is Array<() => void>', () => {
+  const ir = schemaWithScalars({ JSON: 'Array<() => void> | number' });
+  expect(inputTsType(listOfNonNull, ir)).toBe('(Array<() => void> | number)[] | null');
+});
