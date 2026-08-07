@@ -13,7 +13,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rozimek/buildql.git"
+    "url": "git+https://github.com/robertozimek/buildql.git"
   },
   "sideEffects": [
     "./dist/cli/bin.js"
