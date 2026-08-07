@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src", "test"],
+  // `test/perf` is re-listed because a local `exclude` REPLACES the inherited one.
+  // `test/types/nuia` compiles only under its own tsconfig, which turns
+  // `noUncheckedIndexedAccess` on; under the repo default the fixture's
+  // `@ts-expect-error` is unused and reports TS2578.
+  "exclude": ["test/perf", "test/types/nuia"]
+}

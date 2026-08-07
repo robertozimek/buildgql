@@ -1,0 +1,91 @@
+import {
+  argSpec,
+  leafField,
+  leafFieldArgs,
+  objectField,
+  objectFieldArgs,
+} from '../../src/runtime/builders.js';
+import { makeMutation, makeQuery } from '../../src/runtime/operation.js';
+import { createClient } from '../../src/client/index.js';
+
+const User = {
+  id: leafField<'id', ['!'], string>('id', ['!']),
+  firstName: leafField<'firstName', ['!'], string>('firstName', ['!']),
+  lastName: leafField<'lastName', [], string>('lastName', []),
+};
+const query = makeQuery({ users: objectField('users', ['!', 'l', '!'], User) });
+const mutation = makeMutation({
+  createUser: objectFieldArgs(
+    'createUser',
+    ['!'],
+    User,
+    argSpec<{ name: string; email: string }>({ name: 'String!', email: 'String!' }),
+  ),
+});
+const client = createClient({ url: 'http://localhost/graphql' });
+
+const m = mutation('CreateNewUser', ($, M) => [
+  M.createUser({ name: $.name, email: $.email }, (U) => [U.id]),
+]);
+const q = query('Users', ($, Q) => [Q.users((U) => [U.id, U.lastName])]);
+
+// A query whose only variable comes from an OPTIONAL argument. `HasVars` must key off
+// required variables only — otherwise this all-optional case would wrongly force a
+// positional `vars` argument on `execute`/`subscribe` (regression guard for the
+// `keyof V extends never` version of `HasVars`, which can't distinguish `{ note?: T }`
+// from `{ note: T }`).
+const optionalOnlyQuery = makeQuery({
+  echo: leafFieldArgs<'echo', ['!'], string, { note?: string }>(
+    'echo',
+    ['!'],
+    argSpec<{ note?: string }>({ note: 'String' }),
+  ),
+})('Echo', ($, Q) => [Q.echo({ note: $.note })]);
+const optionalClient = createClient({ url: 'http://localhost/graphql' });
+
+// The `() => HeadersInit | Promise<HeadersInit>` arm of `HeadersSource` — the lazy
+// auth-token form, which no other type test covers. Its whole point is that the
+// supplier is re-invoked per request, so it must type-check as an async function.
+const lazyHeaderClient = createClient({
+  url: 'http://localhost/graphql',
+  headers: async () => ({ a: 'b' }),
+});
+// ...but only when it actually produces headers.
+// @ts-expect-error a headers function must resolve to HeadersInit, not an arbitrary value
+createClient({ url: 'http://localhost/graphql', headers: async () => 42 });
+
+async function main() {
+  const r = await client.execute(m, { name: 'John Smith', email: 'john@smith.com' });
+  const id: string = r.createUser.id;
+
+  // an operation with no variables needs no second argument
+  const r2 = await client.execute(q);
+  const bio: string | null = r2.users[0]!.lastName;
+
+  // @ts-expect-error missing required variable
+  await client.execute(m, { name: 'x' });
+  // @ts-expect-error wrong variable type
+  await client.execute(m, { name: 1, email: 'x' });
+  // @ts-expect-error unknown variable
+  await client.execute(m, { name: 'a', email: 'b', extra: 1 });
+  // @ts-expect-error field was not selected
+  r.createUser.firstName;
+
+  // Pre-declared vars: without NoInfer, `V` would be inferred from this argument
+  // and the missing `email` would be silently accepted. This is the only case in
+  // this file that actually guards NoInfer — the inline-literal cases above are
+  // caught by excess-property checking regardless.
+  const preDeclared = { name: 'x' };
+  // @ts-expect-error missing required variable
+  await client.execute(m, preDeclared);
+
+  // An all-optional variable map must NOT force a positional `vars` argument.
+  const r3 = await optionalClient.execute(optionalOnlyQuery);
+  const echoed: string = r3.echo;
+  // ...but a caller who wants to pass one still can.
+  const r4 = await optionalClient.execute(optionalOnlyQuery, { note: 'hi' });
+
+  return { id, bio, echoed, r4 };
+}
+
+export { main };
