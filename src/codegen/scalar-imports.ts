@@ -1,9 +1,4 @@
-import {
-  isAbsolute as defaultIsAbsolute,
-  relative as defaultRelative,
-  resolve as defaultResolve,
-  sep as defaultSep,
-} from 'node:path';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 /**
  * Subset of `node:path` methods used by `toOutputRelativeSpecifier`, exposed purely as a
@@ -21,6 +16,13 @@ export interface PathModule {
   readonly sep: string;
 }
 
+const defaultPathModule: PathModule = {
+  isAbsolute,
+  relative,
+  resolve,
+  sep,
+};
+
 /**
  * True when `spec` names a *package* rather than a file on disk — it neither starts with `.`
  * nor is absolute. Bare specifiers are emitted verbatim: when the generated module is
@@ -29,7 +31,7 @@ export interface PathModule {
  * and rewriting it against a directory layout that no longer exists would break it.
  */
 export function isBareSpecifier(spec: string): boolean {
-  return !spec.startsWith('.') && !defaultIsAbsolute(spec);
+  return !spec.startsWith('.') && !isAbsolute(spec);
 }
 
 /**
@@ -46,22 +48,16 @@ export function toOutputRelativeSpecifier(
   spec: string,
   configDir: string,
   outputDir: string,
-  pathModule?: PathModule,
+  pathModule: PathModule = defaultPathModule,
 ): string {
-  const path = pathModule || {
-    isAbsolute: defaultIsAbsolute,
-    relative: defaultRelative,
-    resolve: defaultResolve,
-    sep: defaultSep,
-  };
   if (isBareSpecifier(spec)) return spec;
-  const target = path.resolve(configDir, spec);
-  const rel = path.relative(outputDir, target).split(path.sep).join('/');
+  const target = pathModule.resolve(configDir, spec);
+  const rel = pathModule.relative(outputDir, target).split(pathModule.sep).join('/');
   // On Windows, when configDir and outputDir sit on different drives, `path.relative()`
   // returns the target's absolute path unchanged. That absolute path does not start with
   // `.`, so our final line would incorrectly prefix it, producing a nonsense specifier.
   // Throw instead, telling the user to use a bare specifier (e.g. `'@myorg/types'`).
-  if (path.isAbsolute(rel)) {
+  if (pathModule.isAbsolute(rel)) {
     throw new Error(
       `buildql: cannot rewrite ${spec} for output: configDir (${configDir}) and outputDir (${outputDir}) ` +
         `have no shared base path (on Windows, they may be on different drives). ` +
