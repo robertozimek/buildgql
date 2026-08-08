@@ -1,7 +1,24 @@
-import type { ScalarConfig } from '../codegen/scalars.js';
+import type { ScalarConfig, ScalarTypeConfig } from '../codegen/scalars.js';
 
-/** The only keys a `scalars` object entry may carry. Anything else is a typo. */
-const SCALAR_KEYS = ['name', 'from', 'declare', 'input', 'output'] as const;
+/**
+ * The only keys a `scalars` object entry may carry. Anything else is a typo.
+ *
+ * `satisfies readonly (keyof ScalarTypeConfig)[]` catches a key listed here that
+ * `ScalarTypeConfig` does not declare (a typo in this array). `AllScalarKeysListed` below
+ * catches the opposite drift — a key added to `ScalarTypeConfig` and forgotten here, which
+ * would otherwise compile clean while the validator silently rejects the new key as unknown.
+ */
+const SCALAR_KEYS = [
+  'name',
+  'from',
+  'declare',
+  'input',
+  'output',
+] as const satisfies readonly (keyof ScalarTypeConfig)[];
+
+/** Fails to compile if a key is added to `ScalarTypeConfig` without being added to `SCALAR_KEYS`. */
+export type AllScalarKeysListed =
+  Exclude<keyof ScalarTypeConfig, (typeof SCALAR_KEYS)[number]> extends never ? true : never;
 
 /**
  * What `name` must look like to be spliced into `import type { <name> }` / `export type <name>`.
@@ -10,6 +27,94 @@ const SCALAR_KEYS = ['name', 'from', 'declare', 'input', 'output'] as const;
  * a syntax error inside a generated file — is much harder to trace back to the config line.
  */
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/**
+ * `name` values that pass `IDENTIFIER` but still break `import type { <name> }` or
+ * `export type <name> = ...` in the generated module. Verified against TypeScript 5.9
+ * (`tsc --strict`), not guessed — two different reasons land a word here:
+ *
+ * - The ECMAScript reserved words (plus `await`, reserved at module top level, and the
+ *   strict-mode future-reserved words `implements`/`interface`/`let`/`package`/`private`/
+ *   `protected`/`public`/`static`/`yield` — modules are always strict) fail to parse as
+ *   either an import binding or a type-alias name at all (e.g. `import type { class }`).
+ * - The predefined/utility type names (`any`, `bigint`, `boolean`, `never`, `number`,
+ *   `object`, `string`, `symbol`, `undefined`, `unknown`) parse fine as an import binding —
+ *   TypeScript only rejects them as a type-alias name (TS2457) — but since `name` can be
+ *   used with either `from` or `declare`, both are rejected here regardless of which one
+ *   the entry actually sets. `null` and `void` are reserved words already covered by the
+ *   first bucket above; TypeScript separately reports TS2457 for them too, so they would
+ *   land in this set either way.
+ */
+const RESERVED_NAMES = new Set([
+  'break',
+  'case',
+  'catch',
+  'class',
+  'const',
+  'continue',
+  'debugger',
+  'default',
+  'delete',
+  'do',
+  'else',
+  'enum',
+  'export',
+  'extends',
+  'false',
+  'finally',
+  'for',
+  'function',
+  'if',
+  'import',
+  'in',
+  'instanceof',
+  'new',
+  'null',
+  'return',
+  'super',
+  'switch',
+  'this',
+  'throw',
+  'true',
+  'try',
+  'typeof',
+  'var',
+  'void',
+  'while',
+  'with',
+  'await',
+  'implements',
+  'interface',
+  'let',
+  'package',
+  'private',
+  'protected',
+  'public',
+  'static',
+  'yield',
+  'any',
+  'bigint',
+  'boolean',
+  'never',
+  'number',
+  'object',
+  'string',
+  'symbol',
+  'undefined',
+  'unknown',
+]);
+
+/**
+ * `from` is spliced verbatim into `import type { <name> } from '<from>';` — a single-quoted
+ * string literal, unlike `declare`/`input`/`output`, which are raw TypeScript expressions
+ * the user has always been free to write however they like and which this deliberately does
+ * NOT validate the same way. A `'`, `"`, or newline in `from` would break out of that literal
+ * or otherwise corrupt it into a syntax error inside a file the user never wrote; backslash is
+ * included because it is meaningless here on every platform that matters — even a Windows-style
+ * path must use forward slashes to become a valid specifier — so rejecting it early is strictly
+ * better than emitting one that could parse as an escape sequence.
+ */
+const UNSAFE_IN_QUOTED_SPECIFIER = /['"\n\r\\]/;
 
 /** Narrows to a plain object — arrays are excluded, since `Object.entries` would walk their indices. */
 function isPlainRecord(value: unknown): value is Record<string, unknown> {
@@ -69,7 +174,19 @@ export function assertScalarsConfig(
           `either imported or declared, not both`,
       );
     }
-    if (from !== undefined) assertNonEmptyString(configName, scalar, 'from', from);
+    if (from !== undefined) {
+      assertNonEmptyString(configName, scalar, 'from', from);
+      // `declare`/`input`/`output` are deliberately NOT checked this way — they are raw
+      // TypeScript expressions that have always been spliced in unescaped, and quoting rules
+      // do not apply to them. Only `from` lands inside a quoted string literal.
+      if (UNSAFE_IN_QUOTED_SPECIFIER.test(from)) {
+        throw new Error(
+          `buildql: ${configName}'s "scalars.${scalar}.from" ("${from}") contains a character ` +
+            `("'", '"', a backslash, or a newline) that cannot appear there — "from" is emitted ` +
+            `inside a quoted module specifier. Use forward slashes even for a Windows-style path.`,
+        );
+      }
+    }
     if (declare !== undefined) assertNonEmptyString(configName, scalar, 'declare', declare);
     if (input !== undefined) assertNonEmptyString(configName, scalar, 'input', input);
     if (output !== undefined) assertNonEmptyString(configName, scalar, 'output', output);
@@ -79,6 +196,12 @@ export function assertScalarsConfig(
       if (!IDENTIFIER.test(name)) {
         throw new Error(
           `buildql: ${configName}'s "scalars.${scalar}.name" ("${name}") is not a valid TypeScript identifier`,
+        );
+      }
+      if (RESERVED_NAMES.has(name)) {
+        throw new Error(
+          `buildql: ${configName}'s "scalars.${scalar}.name" ("${name}") is a reserved word and cannot be ` +
+            `spliced into "import type { ${name} }" or "export type ${name} = ..." — choose a different name`,
         );
       }
       if (from === undefined && declare === undefined) {

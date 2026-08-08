@@ -30,8 +30,8 @@ const defaultPathModule: PathModule = {
  * bare specifier is the only form that still resolves from inside the published package,
  * and rewriting it against a directory layout that no longer exists would break it.
  */
-export function isBareSpecifier(spec: string): boolean {
-  return !spec.startsWith('.') && !isAbsolute(spec);
+export function isBareSpecifier(spec: string, pathModule: PathModule = defaultPathModule): boolean {
+  return !spec.startsWith('.') && !pathModule.isAbsolute(spec);
 }
 
 /**
@@ -50,18 +50,19 @@ export function toOutputRelativeSpecifier(
   outputDir: string,
   pathModule: PathModule = defaultPathModule,
 ): string {
-  if (isBareSpecifier(spec)) return spec;
+  if (isBareSpecifier(spec, pathModule)) return spec;
   const target = pathModule.resolve(configDir, spec);
   const rel = pathModule.relative(outputDir, target).split(pathModule.sep).join('/');
   // On Windows, when configDir and outputDir sit on different drives, `path.relative()`
   // returns the target's absolute path unchanged. That absolute path does not start with
   // `.`, so our final line would incorrectly prefix it, producing a nonsense specifier.
-  // Throw instead, telling the user to use a bare specifier (e.g. `'@myorg/types'`).
+  // Throw instead, telling the user to use a bare specifier or the `declare` form.
   if (pathModule.isAbsolute(rel)) {
     throw new Error(
       `buildql: cannot rewrite ${spec} for output: configDir (${configDir}) and outputDir (${outputDir}) ` +
         `have no shared base path (on Windows, they may be on different drives). ` +
-        `Use a bare package specifier (e.g. '@myorg/types') or \`declare module\` instead.`,
+        `Use a bare package specifier (e.g. '@myorg/types') or the "declare" config key ` +
+        `(e.g. { name: 'Money', declare: '...' }) instead.`,
     );
   }
   // `relative()` returns '' when the two paths are identical, and returns a bare `name` (no
