@@ -8,3 +8,6 @@ test/perf/tsconfig.json
 # `npm pack` extracted here while verifying the published tarball. Never tracked,
 # but ESLint walks into it and chokes on files outside the tsconfig project.
 package/
+
+# Lavish review surfaces — scratch HTML for reviewing plans, not project content.
+.lavish/
