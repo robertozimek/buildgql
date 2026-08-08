@@ -4,7 +4,7 @@
 
 **Goal:** Let `scalars` in `buildql.config.*` map a GraphQL scalar to a real object-shaped TypeScript type — imported from a module, declared inline, and/or typed differently in argument vs result position — instead of only a raw inline type expression.
 
-**Architecture:** `scalars` grows from `Record<string, string>` to `Record<string, string | ScalarTypeConfig>`. A new `resolveScalars()` in `src/codegen/scalars.ts` normalises every entry into a `ScalarMapping` (`{ input, output }`) plus a *prelude* — the `import type` lines and `export type` aliases the generated module must carry. The IR carries both; `ts-types.ts` picks `.input` or `.output` by position; `emit.ts` renders the prelude between the runtime import and the generated types. Module specifiers are rewritten by `src/codegen/scalar-imports.ts` so a relative `from` written against the config file lands correctly relative to `output`, while bare specifiers pass through untouched.
+**Architecture:** `scalars` grows from `Record<string, string>` to `Record<string, string | ScalarTypeConfig>`. A new `resolveScalars()` in `src/codegen/scalars.ts` normalises every entry into a `ScalarMapping` (`{ input, output }`) plus a _prelude_ — the `import type` lines and `export type` aliases the generated module must carry. The IR carries both; `ts-types.ts` picks `.input` or `.output` by position; `emit.ts` renders the prelude between the runtime import and the generated types. Module specifiers are rewritten by `src/codegen/scalar-imports.ts` so a relative `from` written against the config file lands correctly relative to `output`, while bare specifiers pass through untouched.
 
 **Tech Stack:** TypeScript 5.9, Node >= 18, Vitest 2, ESLint 9 + Prettier, tsup. No new dependencies.
 
@@ -14,13 +14,13 @@
 
 The generated module gets consumed in two very different ways, and the rule has to serve both:
 
-| Scenario | What the user writes | What gets emitted |
-| --- | --- | --- |
-| Generated inside the frontend app, types live in the same repo | `from: './src/types/money'` (relative to the config file) | `import type { Money } from '../types/money';` — buildql recomputes it against `output` |
-| Generated in the backend repo and **published as an npm package** | `from: '@myorg/domain-types'` or `from: 'type-fest'` | `import type { Money } from '@myorg/domain-types';` — verbatim; the specifier still resolves from inside the published package |
-| Published package with **no external type dependency at all** | `declare: '{ amount: number; currency: string }'` | `export type Money = { amount: number; currency: string };` — inlined into the generated module, nothing to resolve |
+| Scenario                                                          | What the user writes                                      | What gets emitted                                                                                                              |
+| ----------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Generated inside the frontend app, types live in the same repo    | `from: './src/types/money'` (relative to the config file) | `import type { Money } from '../types/money';` — buildql recomputes it against `output`                                        |
+| Generated in the backend repo and **published as an npm package** | `from: '@myorg/domain-types'` or `from: 'type-fest'`      | `import type { Money } from '@myorg/domain-types';` — verbatim; the specifier still resolves from inside the published package |
+| Published package with **no external type dependency at all**     | `declare: '{ amount: number; currency: string }'`         | `export type Money = { amount: number; currency: string };` — inlined into the generated module, nothing to resolve            |
 
-**The rule:** a specifier that starts with `.` or is absolute is a *file path*, so it is resolved against the config file's directory and re-expressed relative to the output directory. Anything else is a *package specifier* and is emitted byte-for-byte. Extensions are preserved exactly as written (`'./types/money.js'` stays `.js`), so `nodenext` projects keep working.
+**The rule:** a specifier that starts with `.` or is absolute is a _file path_, so it is resolved against the config file's directory and re-expressed relative to the output directory. Anything else is a _package specifier_ and is emitted byte-for-byte. Extensions are preserved exactly as written (`'./types/money.js'` stays `.js`), so `nodenext` projects keep working.
 
 Relative specifiers resolve against the config file's directory because that is where `schema` and `output` already resolve from — one mental model for every path in the config — and because it means changing `output` cannot silently break an import.
 
@@ -30,7 +30,7 @@ All imports are emitted as `import type`, so the generated module never carries 
 
 ## Global Constraints
 
-- Every thrown message starts with `buildql: ` — plain `Error` is fine in `src/`; new error *classes* would have to extend `BuildQLError` (none are added here).
+- Every thrown message starts with `buildql: ` — plain `Error` is fine in `src/`; new error _classes_ would have to extend `BuildQLError` (none are added here).
 - `any` is banned. `unknown` plus a documented cast is the house style.
 - Files are kebab-case, one responsibility each. A file past ~200 lines gets split.
 - Function prefixes carry meaning: `is*` type-guard, `assert*` throws or narrows, `emit*` renders TypeScript source, `to*` pure conversion.
@@ -323,7 +323,7 @@ git commit -m "feat(scalars): resolve scalar config into per-position mappings a
 
 ### Task 2: Module specifier rewriting
 
-Turns a `from` written against the config file into one the *generated module* can resolve. Pure path math, no I/O, so it is fully testable without a filesystem.
+Turns a `from` written against the config file into one the _generated module_ can resolve. Pure path math, no I/O, so it is fully testable without a filesystem.
 
 **Files:**
 
@@ -369,9 +369,7 @@ describe('toOutputRelativeSpecifier', () => {
   });
 
   it('rewrites a config-relative path to an output-relative one', () => {
-    expect(toOutputRelativeSpecifier('./src/types/money', '/repo', '/repo/src/gql')).toBe(
-      '../types/money',
-    );
+    expect(toOutputRelativeSpecifier('./src/types/money', '/repo', '/repo/src/gql')).toBe('../types/money');
   });
 
   it('prefixes "./" when the target sits inside the output directory', () => {
@@ -672,7 +670,7 @@ export type { ScalarConfig, ScalarTypeConfig } from '../codegen/scalars.js';
 
 Replace the `scalars` field on `BuildQLConfig` (line 16-17):
 
-```ts
+````ts
   /**
    * Maps custom GraphQL scalars to TypeScript types. A string is a raw type expression used in
    * both argument and result position (`{ DateTime: 'string' }`); the object form covers types a
@@ -691,12 +689,12 @@ Replace the `scalars` field on `BuildQLConfig` (line 16-17):
    * npm package needs.
    */
   readonly scalars?: Record<string, ScalarConfig>;
-```
+````
 
 Replace the `scalars` check inside `assertBuildQLConfig` (lines 95-97):
 
 ```ts
-  if (value.scalars !== undefined) assertScalarsConfig(name, value.scalars);
+if (value.scalars !== undefined) assertScalarsConfig(name, value.scalars);
 ```
 
 Leave `isStringRecord` in place — `headers` still uses it. Update its JSDoc, which currently claims it covers `scalars`:
@@ -813,26 +811,23 @@ it('falls back to unknown in both positions for a scalar with no entry', () => {
 In `test/unit/ir.test.ts`, replace the two scalar tests at the end of the file:
 
 ```ts
-  it('applies scalar overrides', async () => {
-    const s = buildIR(await loadSchema(sdlPath), resolveScalars({ ID: 'PostId' }));
-    expect(s.scalars.ID).toEqual({ input: 'PostId', output: 'PostId' });
-    expect(s.scalars.String).toEqual({ input: 'string', output: 'string' });
-  });
+it('applies scalar overrides', async () => {
+  const s = buildIR(await loadSchema(sdlPath), resolveScalars({ ID: 'PostId' }));
+  expect(s.scalars.ID).toEqual({ input: 'PostId', output: 'PostId' });
+  expect(s.scalars.String).toEqual({ input: 'string', output: 'string' });
+});
 
-  it('carries the scalar prelude through to the IR', async () => {
-    const s = buildIR(
-      await loadSchema(sdlPath),
-      resolveScalars({ ID: { name: 'PostId', from: './ids' } }),
-    );
-    expect(s.scalarPrelude.imports).toEqual([{ name: 'PostId', from: './ids' }]);
-  });
+it('carries the scalar prelude through to the IR', async () => {
+  const s = buildIR(await loadSchema(sdlPath), resolveScalars({ ID: { name: 'PostId', from: './ids' } }));
+  expect(s.scalarPrelude.imports).toEqual([{ name: 'PostId', from: './ids' }]);
+});
 
-  it('builds the scalars map with a null prototype, so a scalar named "toString" cannot resolve via Object.prototype', async () => {
-    const s = await ir();
-    expect(Object.getPrototypeOf(s.scalars)).toBe(null);
-    expect(Object.hasOwn(s.scalars, 'toString')).toBe(false);
-    expect(s.scalars['toString']).toBeUndefined();
-  });
+it('builds the scalars map with a null prototype, so a scalar named "toString" cannot resolve via Object.prototype', async () => {
+  const s = await ir();
+  expect(Object.getPrototypeOf(s.scalars)).toBe(null);
+  expect(Object.hasOwn(s.scalars, 'toString')).toBe(false);
+  expect(s.scalars['toString']).toBeUndefined();
+});
 ```
 
 Add `resolveScalars` to that file's imports:
@@ -909,10 +904,10 @@ export function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
 And in `inputTsType` (lines 89-90):
 
 ```ts
-  const base =
-    ref.kind === 'input' || ref.kind === 'enum'
-      ? ref.name
-      : (scalarTsType(ir, ref.name)?.input ?? UNKNOWN_SCALAR);
+const base =
+  ref.kind === 'input' || ref.kind === 'enum'
+    ? ref.name
+    : (scalarTsType(ir, ref.name)?.input ?? UNKNOWN_SCALAR);
 ```
 
 `unmappedScalars` is unchanged — it only tests key presence.
@@ -971,68 +966,68 @@ and replace each of the four `scalars: DEFAULT_SCALARS,` lines with:
 Append to `test/unit/emit.test.ts`, inside the `describe('emit', ...)` block:
 
 ```ts
-  /** The SDL fixture has no custom scalar, so prelude cases build the IR with overrides. */
-  async function generatedWith(overrides: Record<string, ScalarConfig>) {
-    return emit(buildIR(await loadSchema(sdlPath), resolveScalars(overrides)));
-  }
+/** The SDL fixture has no custom scalar, so prelude cases build the IR with overrides. */
+async function generatedWith(overrides: Record<string, ScalarConfig>) {
+  return emit(buildIR(await loadSchema(sdlPath), resolveScalars(overrides)));
+}
 
-  it('emits nothing extra when no scalar contributes a prelude', async () => {
-    // Pins the byte-identical-by-default promise: a config that only uses the string form
-    // must produce exactly what buildql produced before the object form existed.
-    expect(await generatedWith({ ID: 'string' })).toBe(await generated());
-  });
+it('emits nothing extra when no scalar contributes a prelude', async () => {
+  // Pins the byte-identical-by-default promise: a config that only uses the string form
+  // must produce exactly what buildql produced before the object form existed.
+  expect(await generatedWith({ ID: 'string' })).toBe(await generated());
+});
 
-  it('emits a type-only import for an imported scalar type', async () => {
-    const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
-    expect(src).toContain("import type { PostId } from '../types/ids';");
-    // Type-only, so the generated module carries no runtime dependency on the user's module —
-    // which is what lets it be published as a package with the types in devDependencies.
-    expect(src).not.toContain("import { PostId }");
-  });
+it('emits a type-only import for an imported scalar type', async () => {
+  const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
+  expect(src).toContain("import type { PostId } from '../types/ids';");
+  // Type-only, so the generated module carries no runtime dependency on the user's module —
+  // which is what lets it be published as a package with the types in devDependencies.
+  expect(src).not.toContain('import { PostId }');
+});
 
-  it('exports a declared scalar type so consumers can name it', async () => {
-    const src = await generatedWith({ ID: { name: 'PostId', declare: 'string & { __brand: "post" }' } });
-    expect(src).toContain('export type PostId = string & { __brand: "post" };');
-  });
+it('exports a declared scalar type so consumers can name it', async () => {
+  const src = await generatedWith({ ID: { name: 'PostId', declare: 'string & { __brand: "post" }' } });
+  expect(src).toContain('export type PostId = string & { __brand: "post" };');
+});
 
-  it('groups imports by module and sorts both groups and names', async () => {
-    const src = await generatedWith({
-      ID: { name: 'Zed', from: 'z-pkg' },
-      String: { name: 'Beta', from: 'a-pkg' },
-      Int: { name: 'Alpha', from: 'a-pkg' },
-    });
-    expect(src).toContain("import type { Alpha, Beta } from 'a-pkg';\nimport type { Zed } from 'z-pkg';");
+it('groups imports by module and sorts both groups and names', async () => {
+  const src = await generatedWith({
+    ID: { name: 'Zed', from: 'z-pkg' },
+    String: { name: 'Beta', from: 'a-pkg' },
+    Int: { name: 'Alpha', from: 'a-pkg' },
   });
+  expect(src).toContain("import type { Alpha, Beta } from 'a-pkg';\nimport type { Zed } from 'z-pkg';");
+});
 
-  it('places the prelude after the runtime import and before the generated types', async () => {
-    const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
-    expect(src.indexOf("from 'buildql'")).toBeLessThan(src.indexOf("from '../types/ids'"));
-    expect(src.indexOf("from '../types/ids'")).toBeLessThan(src.indexOf('export const Post = {'));
-  });
+it('places the prelude after the runtime import and before the generated types', async () => {
+  const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
+  expect(src.indexOf("from 'buildql'")).toBeLessThan(src.indexOf("from '../types/ids'"));
+  expect(src.indexOf("from '../types/ids'")).toBeLessThan(src.indexOf('export const Post = {'));
+});
 
-  it('uses the mapped scalar types in both positions in the generated module', async () => {
-    const src = await generatedWith({ ID: { input: 'string | number', output: 'string' } });
-    expect(src).toContain("id: leafField<'id', ['!'], string>('id', ['!'])");
-    expect(src).toContain("argSpec<{ id: string | number }>({ id: 'ID!' })");
-  });
+it('uses the mapped scalar types in both positions in the generated module', async () => {
+  const src = await generatedWith({ ID: { input: 'string | number', output: 'string' } });
+  expect(src).toContain("id: leafField<'id', ['!'], string>('id', ['!'])");
+  expect(src).toContain("argSpec<{ id: string | number }>({ id: 'ID!' })");
+});
 
-  it('throws when a scalar type name collides with a generated schema type', async () => {
-    await expect(generatedWith({ ID: { name: 'Post', declare: 'string' } })).rejects.toThrow(
-      /buildql: a "scalars" entry maps to a TypeScript type named "Post"/,
-    );
-  });
+it('throws when a scalar type name collides with a generated schema type', async () => {
+  await expect(generatedWith({ ID: { name: 'Post', declare: 'string' } })).rejects.toThrow(
+    /buildql: a "scalars" entry maps to a TypeScript type named "Post"/,
+  );
+});
 
-  it('throws when a scalar type name collides with a fragment helper', async () => {
-    await expect(generatedWith({ ID: { name: 'postFragment', declare: 'string' } })).rejects.toThrow(
-      /named "postFragment"/,
-    );
-  });
+it('throws when a scalar type name collides with a fragment helper', async () => {
+  await expect(generatedWith({ ID: { name: 'postFragment', declare: 'string' } })).rejects.toThrow(
+    /named "postFragment"/,
+  );
+});
 
-  it('throws when a scalar type name collides with a runtime import', async () => {
-    await expect(generatedWith({ ID: { name: 'leafField', from: 'pkg' } })).rejects.toThrow(
-      /named "leafField"/,
-    );
-  });
+it('throws when a scalar type name collides with a runtime import', async () => {
+  await expect(generatedWith({ ID: { name: 'leafField', from: 'pkg' } })).rejects.toThrow(
+    /named "leafField"/,
+  );
+});
 ```
 
 Add to that file's imports:
@@ -1254,26 +1249,26 @@ import { resolveScalars } from '../codegen/scalars.js';
 Replace the body of `generate` from the `loadSchema` call through the `buildIR` call (lines 25-26) with:
 
 ```ts
-  const schema = await loadSchema(resolveSchemaSource(config.schema, cwd), { headers: config.headers });
+const schema = await loadSchema(resolveSchemaSource(config.schema, cwd), { headers: config.headers });
 
-  // `dir` is computed before the IR, not after: a relative `scalars[...].from` is written
-  // against the config file and has to be re-expressed against the directory the generated
-  // module actually lands in, which only `resolveOutputDir` knows.
-  const dir = resolveOutputDir(config, cwd);
-  const scalars = resolveScalars(config.scalars, (from) => toOutputRelativeSpecifier(from, cwd, dir));
-  const ir = buildIR(schema, scalars);
+// `dir` is computed before the IR, not after: a relative `scalars[...].from` is written
+// against the config file and has to be re-expressed against the directory the generated
+// module actually lands in, which only `resolveOutputDir` knows.
+const dir = resolveOutputDir(config, cwd);
+const scalars = resolveScalars(config.scalars, (from) => toOutputRelativeSpecifier(from, cwd, dir));
+const ir = buildIR(schema, scalars);
 ```
 
 Add, immediately after the existing `unmapped` warning block (after line 34):
 
 ```ts
-  if (scalars.prelude.imports.length > 0) {
-    const modules = [...new Set(scalars.prelude.imports.map((i) => i.from))].sort();
-    reporter.info(
-      `buildql: the generated module imports scalar types from ${modules.join(', ')} ` +
-        `(relative specifiers are resolved against your config file, then rewritten against "output")`,
-    );
-  }
+if (scalars.prelude.imports.length > 0) {
+  const modules = [...new Set(scalars.prelude.imports.map((i) => i.from))].sort();
+  reporter.info(
+    `buildql: the generated module imports scalar types from ${modules.join(', ')} ` +
+      `(relative specifiers are resolved against your config file, then rewritten against "output")`,
+  );
+}
 ```
 
 Finally, delete the now-duplicated `const dir = resolveOutputDir(config, cwd);` further down (line 47), leaving the `mkdir`/`join`/`writeFile` sequence to use the `dir` computed above.
@@ -1319,20 +1314,20 @@ import { GraphQLScalarType } from 'graphql';
 Add to `typeDefs`, inside the template literal — a new `Query` field plus the types it needs:
 
 ```graphql
-  scalar Money
-  scalar Metadata
-  scalar Timestamp
+scalar Money
+scalar Metadata
+scalar Timestamp
 ```
 
 Add `postMeta(id: ID!, since: Timestamp): PostMeta!` to the `Query` block, and this type after `Post`:
 
 ```graphql
-  type PostMeta {
-    id: ID!
-    metadata: Metadata!
-    updatedAt: Timestamp!
-    price: Money!
-  }
+type PostMeta {
+  id: ID!
+  metadata: Metadata!
+  updatedAt: Timestamp!
+  price: Money!
+}
 ```
 
 Add above `startServer`:
@@ -1550,8 +1545,8 @@ scalars: { DateTime: 'string', JSON: 'unknown' }
 
 For scalars a single expression cannot express, an entry can be an object instead.
 
-**Different types in and out.** A `DateTime` you may *pass* as a `Date` but always *read
-back* as an ISO string:
+**Different types in and out.** A `DateTime` you may _pass_ as a `Date` but always _read
+back_ as an ISO string:
 
 ```js
 scalars: { DateTime: { input: 'string | Date', output: 'string' } }
@@ -1585,7 +1580,7 @@ or declaring the type: `{ name: 'Money', from: './money', input: 'Money | string
 
 A **package specifier** (`type-fest`, `@myorg/domain-types`) is emitted verbatim.
 
-A **relative or absolute path** is written against *your config file* — the same as
+A **relative or absolute path** is written against _your config file_ — the same as
 `schema` and `output` — and buildql rewrites it to be relative to `output`. With
 `output: './src/gql'`, a `from` of `'./src/types/money'` is emitted as `'../types/money'`.
 Extensions are preserved exactly as written, so `nodenext` projects can write
@@ -1658,5 +1653,5 @@ git add -A && git commit -m "chore: formatting after complex scalar work"
 
 - **Spec coverage.** All four requested capabilities are implemented: import a named type (Task 1 `from` + Task 2 rewriting + Task 5 emission), separate input/output (Tasks 1 and 4), inline declaration (Tasks 1 and 5), plain strings still working (Task 1 `toMapping`, pinned byte-for-byte by the Task 5 test and re-checked in Task 9). Strict validation with per-field messages is Task 3. The publish-vs-in-repo concern is addressed by the bare-specifier rule (Task 2), the `declare` form, and the README section in Task 8.
 - **Known ripple.** `IRSchema` gains a required field, so every hand-built `IRSchema` literal in the test suite needs it. Task 4 covers `test/unit/ts-types.test.ts`; Task 5 Step 1 covers the four in `test/unit/emit.test.ts`. If a subagent finds another one, add `scalarPrelude: EMPTY_SCALAR_PRELUDE` there too.
-- **Naming consistency.** `resolveScalars` → `ResolvedScalars { scalars, prelude }`; `IRSchema.scalars` / `IRSchema.scalarPrelude`; `ScalarMapping { input, output }`; `ScalarImport { name, from }`; `ScalarDeclaration { name, body }`. `ScalarDeclaration.body` is deliberately not called `declare` — `declare` is the *config* key, `body` is what the emitter splices.
-- **Not in scope.** Runtime serialisation of object-shaped scalars passed as *inline* argument literals still goes through `printValue` in `src/runtime/print.ts`, which prints unquoted GraphQL object syntax. That is correct for the common JSON-scalar server, but it has no view of the scalar's type, so a value whose keys are not valid GraphQL names cannot be printed as a literal. Passing such a value as a variable (`$.metadata`) always works, since JSON variable transport is untouched by any of this. Worth a follow-up only if it comes up in practice.
+- **Naming consistency.** `resolveScalars` → `ResolvedScalars { scalars, prelude }`; `IRSchema.scalars` / `IRSchema.scalarPrelude`; `ScalarMapping { input, output }`; `ScalarImport { name, from }`; `ScalarDeclaration { name, body }`. `ScalarDeclaration.body` is deliberately not called `declare` — `declare` is the _config_ key, `body` is what the emitter splices.
+- **Not in scope.** Runtime serialisation of object-shaped scalars passed as _inline_ argument literals still goes through `printValue` in `src/runtime/print.ts`, which prints unquoted GraphQL object syntax. That is correct for the common JSON-scalar server, but it has no view of the scalar's type, so a value whose keys are not valid GraphQL names cannot be printed as a literal. Passing such a value as a variable (`$.metadata`) always works, since JSON variable transport is untouched by any of this. Worth a follow-up only if it comes up in practice.
