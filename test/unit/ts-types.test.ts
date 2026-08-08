@@ -108,7 +108,11 @@ const nonNullRef: IRTypeRef = { wrap: ['!'], name: 'JSON', kind: 'scalar' };
 it('reads the output type in result position and the input type in argument position', () => {
   const ir = schemaWithScalars({ JSON: { input: 'string | Date', output: 'string' } });
   expect(leafTsType(nonNullRef, ir)).toBe('string');
-  expect(inputTsType(nonNullRef, ir)).toBe('string | Date');
+  // The atomicity guard wraps any non-atomic base unconditionally, pre-existing
+  // behaviour that predates this feature — `leafTsType` above is unguarded because
+  // its result is spliced into a type-argument list where `|` binds tighter than the
+  // `,` separating arguments; `inputTsType` has no such guarantee at its call sites.
+  expect(inputTsType(nonNullRef, ir)).toBe('(string | Date)');
 });
 
 it('still parenthesises a split input type inside a list', () => {
