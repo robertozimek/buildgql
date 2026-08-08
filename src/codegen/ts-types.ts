@@ -1,5 +1,6 @@
 import type { IRField, IRSchema, IRType, IRTypeRef } from './ir.js';
 import { UNKNOWN_SCALAR } from './scalars.js';
+import type { ScalarMapping } from './scalars.js';
 
 /**
  * Looks up a scalar's mapped TS type by *own* property only. A plain `map[name]` (or
@@ -9,14 +10,14 @@ import { UNKNOWN_SCALAR } from './scalars.js';
  * and splicing e.g. `Object.prototype.toString` into the generated source. `ir.scalars`
  * is also built with a null prototype (see `buildIR`) as defense in depth.
  */
-function scalarTsType(ir: IRSchema, name: string): string | undefined {
+function scalarTsType(ir: IRSchema, name: string): ScalarMapping | undefined {
   return Object.hasOwn(ir.scalars, name) ? ir.scalars[name] : undefined;
 }
 
-/** The TypeScript type a *leaf* (scalar/enum) named type maps to. */
+/** The TypeScript type a *leaf* (scalar/enum) named type maps to, in **result** position. */
 export function leafTsType(ref: IRTypeRef, ir: IRSchema): string {
   if (ref.kind === 'enum') return ref.name;
-  return scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR;
+  return scalarTsType(ir, ref.name)?.output ?? UNKNOWN_SCALAR;
 }
 
 /**
@@ -87,11 +88,16 @@ function isAtomicTypeExpression(type: string): boolean {
 /** The TypeScript type of an *input* position, wrappers included. */
 export function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
   const base =
-    ref.kind === 'input' || ref.kind === 'enum' ? ref.name : (scalarTsType(ir, ref.name) ?? UNKNOWN_SCALAR);
+    ref.kind === 'input' || ref.kind === 'enum'
+      ? ref.name
+      : (scalarTsType(ir, ref.name)?.input ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
-  // Only the base needs the atomicity guard: every later iteration appends to a
-  // string already ending in `[]`, which binds tightly on its own.
-  let out = isAtomicTypeExpression(base) ? base : `(${base})`;
+  // Only the base needs the atomicity guard, and only if a `[]` will actually land on
+  // it: a bare non-null/nullable ref (no list anywhere in `wrap`) never gets `[]`
+  // appended, and a trailing `| null` binds no tighter than the base's own top-level
+  // `|`/`&`, so guarding it would only add parens no reader or compiler needs.
+  const needsGuard = ref.wrap.includes('l');
+  let out = needsGuard && !isAtomicTypeExpression(base) ? `(${base})` : base;
   const toks = [...ref.wrap].reverse();
   let nonNull = false;
   for (const tok of toks) {

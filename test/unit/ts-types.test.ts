@@ -1,22 +1,19 @@
 import { expect, it } from 'vitest';
-import { inputTsType } from '../../src/codegen/ts-types.js';
+import { inputTsType, leafTsType } from '../../src/codegen/ts-types.js';
+import { resolveScalars } from '../../src/codegen/scalars.js';
 import type { IRSchema, IRTypeRef } from '../../src/codegen/ir.js';
+import type { ScalarConfig } from '../../src/codegen/scalars.js';
 
-/** A minimal IRSchema carrying only the scalar map `inputTsType` reads. */
-function schemaWithScalars(scalars: Record<string, string>): IRSchema {
+/** A minimal IRSchema carrying only the scalar map `inputTsType`/`leafTsType` read. */
+function schemaWithScalars(scalars: Record<string, ScalarConfig>): IRSchema {
+  const resolved = resolveScalars(scalars);
   return {
     queryType: 'Query',
     mutationType: null,
     subscriptionType: null,
     types: [],
-    scalars: {
-      ID: 'string',
-      String: 'string',
-      Int: 'number',
-      Float: 'number',
-      Boolean: 'boolean',
-      ...scalars,
-    },
+    scalars: resolved.scalars,
+    scalarPrelude: resolved.prelude,
   };
 }
 
@@ -104,4 +101,31 @@ it('parenthesises a union whose first operand is a generic containing a function
 it('parenthesises a union whose first operand is Array<() => void>', () => {
   const ir = schemaWithScalars({ JSON: 'Array<() => void> | number' });
   expect(inputTsType(listOfNonNull, ir)).toBe('(Array<() => void> | number)[] | null');
+});
+
+const nonNullRef: IRTypeRef = { wrap: ['!'], name: 'JSON', kind: 'scalar' };
+
+it('reads the output type in result position and the input type in argument position', () => {
+  const ir = schemaWithScalars({ JSON: { input: 'string | Date', output: 'string' } });
+  expect(leafTsType(nonNullRef, ir)).toBe('string');
+  expect(inputTsType(nonNullRef, ir)).toBe('string | Date');
+});
+
+it('still parenthesises a split input type inside a list', () => {
+  // The atomicity guard applies to whichever expression the *input* side resolved to,
+  // not to whatever the output side happens to be.
+  const ir = schemaWithScalars({ JSON: { input: 'string | Date', output: 'string' } });
+  expect(inputTsType(listOfNonNull, ir)).toBe('(string | Date)[] | null');
+});
+
+it('uses an imported name in both positions', () => {
+  const ir = schemaWithScalars({ JSON: { name: 'Money', from: './money' } });
+  expect(leafTsType(nonNullRef, ir)).toBe('Money');
+  expect(inputTsType(nonNullRef, ir)).toBe('Money');
+});
+
+it('falls back to unknown in both positions for a scalar with no entry', () => {
+  const ir = schemaWithScalars({});
+  expect(leafTsType(nonNullRef, ir)).toBe('unknown');
+  expect(inputTsType(nonNullRef, ir)).toBe('unknown');
 });
