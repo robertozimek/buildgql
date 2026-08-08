@@ -339,7 +339,7 @@ describe('emit', () => {
 
   it('falls back to `unknown` for an unmapped scalar named "valueOf", rather than splicing in the inherited Object.prototype member', () => {
     // Regression test for leafTsType/inputTsType: `ir.scalars` here is a plain object
-    // (`DEFAULT_SCALARS` inherits from `Object.prototype`), so a bracket read of
+    // (`DEFAULT_SCALAR_MAPPINGS` inherits from `Object.prototype`), so a bracket read of
     // `ir.scalars['valueOf']` without an own-property guard would resolve to
     // `Object.prototype.valueOf` (a function, not `undefined`) and defeat the `??
     // UNKNOWN_SCALAR` fallback entirely.
@@ -487,6 +487,10 @@ describe('emit', () => {
     // Pins the byte-identical-by-default promise: a config that only uses the string form
     // must produce exactly what buildql produced before the object form existed.
     expect(await generatedWith({ ID: 'string' })).toBe(await generated());
+    // The assertion above cannot catch an unconditional `parts.push(prelude)`: an empty
+    // prelude would add the same blank line to both sides. This one can — it pins the exact
+    // bytes where the prelude would land if it were ever pushed empty.
+    expect(await generated()).toContain("} from 'buildql';\n\nexport const Query = {");
   });
 
   it('emits a type-only import for an imported scalar type', async () => {
@@ -623,7 +627,7 @@ describe('unmappedScalars', () => {
   });
 
   it('flags a scalar named "toString" as unmapped, even though `name in scalars` would resolve it via Object.prototype', () => {
-    // Regression test: `scalars` here is a plain object (as `DEFAULT_SCALARS` is), so
+    // Regression test: `scalars` here is a plain object (as `DEFAULT_SCALAR_MAPPINGS` is), so
     // it inherits `toString`/`valueOf`/`constructor` from `Object.prototype`. A
     // membership check using `in` (rather than `Object.hasOwn`) would treat those
     // names as "mapped" and never flag them.

@@ -67,7 +67,10 @@ function scalarPreludeBlock(prelude: ScalarPrelude): string {
   // machine's locale, or the same config would emit different bytes on different machines.
   const lines = [...byModule.entries()]
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([from, names]) => `import type { ${[...names].sort().join(', ')} } from '${from}';`);
+    .map(
+      ([from, names]) =>
+        `import type { ${[...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)).join(', ')} } from '${from}';`,
+    );
   const decls = [...prelude.declarations]
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
     .map((d) => `export type ${d.name} = ${d.body};`);
