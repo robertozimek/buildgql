@@ -67,13 +67,85 @@ describe('loadConfig', () => {
     await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"headers"/);
   });
 
-  it('errors clearly when scalars is not a string record', async () => {
+  it('errors clearly when a scalars entry is neither a string nor an object', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
     await writeFile(
       join(dir, 'buildql.config.mjs'),
       "export default { schema: './schema.graphql', scalars: { DateTime: 42 } };\n",
     );
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars"/);
+    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars\.DateTime"/);
+  });
+
+  /** Writes `source` as the default export of a buildql.config.mjs in a fresh temp dir. */
+  async function configDir(source: string): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    await writeFile(
+      join(dir, 'buildql.config.mjs'),
+      `export default { schema: './s.graphql', ${source} };\n`,
+    );
+    return dir;
+  }
+
+  it('accepts the object form of a scalars entry', async () => {
+    const dir = await configDir(
+      "scalars: { Money: { name: 'Money', from: './src/types/money' }, DateTime: { input: 'string | Date', output: 'string' }, Plain: 'string' }",
+    );
+    const { config } = await loadConfig(dir);
+    expect(config.scalars).toEqual({
+      Money: { name: 'Money', from: './src/types/money' },
+      DateTime: { input: 'string | Date', output: 'string' },
+      Plain: 'string',
+    });
+  });
+
+  it('rejects a scalars entry that is neither a string nor an object', async () => {
+    const dir = await configDir('scalars: { DateTime: 42 }');
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.DateTime"/);
+  });
+
+  it('rejects an empty string scalars entry', async () => {
+    const dir = await configDir("scalars: { DateTime: '' }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.DateTime".*empty/);
+  });
+
+  it('rejects an unknown key, so a typo does not silently do nothing', async () => {
+    const dir = await configDir("scalars: { DateTime: { ouput: 'string' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/unknown key "ouput"/);
+  });
+
+  it('rejects "from" and "declare" together', async () => {
+    const dir = await configDir("scalars: { J: { name: 'J', from: 'pkg', declare: 'string' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/both "from" and "declare"/);
+  });
+
+  it('rejects a "name" that is not a valid TypeScript identifier', async () => {
+    const dir = await configDir("scalars: { J: { name: 'my type', from: 'pkg' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.name" \("my type"\) is not a valid/);
+  });
+
+  it('rejects "name" without "from" or "declare", which would declare nothing', async () => {
+    const dir = await configDir("scalars: { J: { name: 'J' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/neither "from" nor "declare"/);
+  });
+
+  it('rejects an empty scalars object entry', async () => {
+    const dir = await configDir('scalars: { J: {} }');
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J" is empty/);
+  });
+
+  it('rejects "from" without "name", which would leave nothing to refer to the imported type by', async () => {
+    const dir = await configDir("scalars: { J: { from: 'pkg' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J".*"name"/);
+  });
+
+  it('rejects a non-string "from"', async () => {
+    const dir = await configDir("scalars: { J: { name: 'J', from: 42 } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.from" must be a non-empty string/);
+  });
+
+  it('rejects an array scalars entry, which Object.entries would otherwise walk', async () => {
+    const dir = await configDir("scalars: { J: ['string'] }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J"/);
   });
 
   it("surfaces the config module's own error instead of TypeScript-support advice", async () => {
