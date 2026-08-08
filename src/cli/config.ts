@@ -3,8 +3,11 @@ import { pathToFileURL } from 'node:url';
 import { isAbsolute, join, resolve } from 'node:path';
 import { CLIENT_KINDS, isClientKind } from '../codegen/clients.js';
 import type { ClientKind } from '../codegen/clients.js';
+import { assertScalarsConfig } from './assert-scalars.js';
+import type { ScalarConfig } from '../codegen/scalars.js';
 
 export type { ClientKind } from '../codegen/clients.js';
+export type { ScalarConfig, ScalarTypeConfig } from '../codegen/scalars.js';
 
 export interface BuildQLConfig {
   /** URL, path to an introspection .json, or path to an SDL file. */
@@ -13,8 +16,24 @@ export interface BuildQLConfig {
   readonly headers?: Record<string, string>;
   /** Directory for the generated module. Defaults to `./src/gql`. */
   readonly output?: string;
-  /** Maps custom GraphQL scalars to TypeScript types, e.g. `{ DateTime: 'string' }`. */
-  readonly scalars?: Record<string, string>;
+  /**
+   * Maps custom GraphQL scalars to TypeScript types. A string is a raw type expression used in
+   * both argument and result position (`{ DateTime: 'string' }`); the object form covers types a
+   * single expression cannot express — see `ScalarTypeConfig`:
+   *
+   * ```js
+   * scalars: {
+   *   DateTime: { input: 'string | Date', output: 'string' },
+   *   Money:    { name: 'Money', from: './src/types/money' },
+   *   JSON:     { name: 'JSONValue', declare: 'string | number | boolean | null | JSONValue[] | { [k: string]: JSONValue }' },
+   * }
+   * ```
+   *
+   * A relative `from` is written against *this config file* and rewritten against `output`;
+   * a package specifier is emitted verbatim, which is what a generated module published as an
+   * npm package needs.
+   */
+  readonly scalars?: Record<string, ScalarConfig>;
   /**
    * Which GraphQL client the generated module binds to. `'buildql'` (the default) re-exports
    * buildql's own `createClient`; `'apollo'` and `'urql'` re-export that client's adapter
@@ -45,7 +64,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-/** True when every own value of `value` is a string (used for the `headers`/`scalars` maps). */
+/** True when every own value of `value` is a string (used for the `headers` map). */
 function isStringRecord(value: unknown): value is Record<string, string> {
   return isRecord(value) && Object.values(value).every((v) => typeof v === 'string');
 }
@@ -76,8 +95,8 @@ function isMissingTypeStrippingSupport(err: unknown): boolean {
 
 /**
  * Throws a field-specific `buildql:`-prefixed error unless `value` is a well-formed
- * BuildQLConfig: a non-empty string `schema`, and — when present — a string `output` and
- * string-valued `headers`/`scalars` records.
+ * BuildQLConfig: a non-empty string `schema`, and — when present — a string `output` and a
+ * string-valued `headers` record and a well-formed `scalars` map (see `assertScalarsConfig`).
  */
 function assertBuildQLConfig(
   name: string,
@@ -92,9 +111,7 @@ function assertBuildQLConfig(
   if (value.headers !== undefined && !isStringRecord(value.headers)) {
     throw new Error(`buildql: ${name}'s "headers" must be a record of string values`);
   }
-  if (value.scalars !== undefined && !isStringRecord(value.scalars)) {
-    throw new Error(`buildql: ${name}'s "scalars" must be a record of string values`);
-  }
+  if (value.scalars !== undefined) assertScalarsConfig(name, value.scalars);
   if (value.client !== undefined && !isClientKind(value.client)) {
     throw new Error(
       `buildql: ${name}'s "client" must be one of ${CLIENT_KINDS.map((k) => `"${k}"`).join(', ')}`,
