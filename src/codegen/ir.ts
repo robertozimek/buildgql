@@ -4,7 +4,8 @@ import type {
   IntrospectionType,
   IntrospectionTypeRef,
 } from './introspect.js';
-import { DEFAULT_SCALARS } from './scalars.js';
+import { resolveScalars } from './scalars.js';
+import type { ResolvedScalars, ScalarMapping, ScalarPrelude } from './scalars.js';
 
 export type IRKind = 'scalar' | 'enum' | 'object' | 'interface' | 'union' | 'input';
 
@@ -46,7 +47,9 @@ export interface IRSchema {
   readonly mutationType: string | null;
   readonly subscriptionType: string | null;
   readonly types: IRType[];
-  readonly scalars: Record<string, string>;
+  readonly scalars: Record<string, ScalarMapping>;
+  /** `import type` lines and type aliases the scalar config makes the generated module carry. */
+  readonly scalarPrelude: ScalarPrelude;
 }
 
 function irKind(kind: string): IRKind {
@@ -102,10 +105,7 @@ function toArg(iv: IntrospectionInputValue, kinds: ReadonlyMap<string, IRKind>):
   };
 }
 
-export function buildIR(
-  schema: IntrospectionResult,
-  scalarOverrides: Readonly<Record<string, string>> = {},
-): IRSchema {
+export function buildIR(schema: IntrospectionResult, scalars: ResolvedScalars = resolveScalars()): IRSchema {
   const relevant = schema.__schema.types.filter((t: IntrospectionType) => !t.name.startsWith('__'));
   const kinds = new Map<string, IRKind>(relevant.map((t) => [t.name, irKind(t.kind)]));
 
@@ -135,7 +135,9 @@ export function buildIR(
     // A null-prototype target means a scalar legitimately named `toString`, `valueOf`,
     // or `constructor` cannot resolve to an inherited `Object.prototype` member on
     // either an `in`/`Object.hasOwn` membership check or a plain bracket read — there
-    // is no prototype chain left to walk.
-    scalars: Object.assign(Object.create(null) as Record<string, string>, DEFAULT_SCALARS, scalarOverrides),
+    // is no prototype chain left to walk. `resolveScalars` has already merged the
+    // built-in five underneath the user's overrides.
+    scalars: Object.assign(Object.create(null) as Record<string, ScalarMapping>, scalars.scalars),
+    scalarPrelude: scalars.prelude,
   };
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import { loadSchema } from '../../src/codegen/introspect.js';
 import { buildIR } from '../../src/codegen/ir.js';
+import { resolveScalars } from '../../src/codegen/scalars.js';
 
 const sdlPath = fileURLToPath(new URL('../fixtures/schema.graphql', import.meta.url));
 
@@ -63,9 +64,14 @@ describe('buildIR', () => {
   });
 
   it('applies scalar overrides', async () => {
-    const s = buildIR(await loadSchema(sdlPath), { ID: 'PostId' });
-    expect(s.scalars.ID).toBe('PostId');
-    expect(s.scalars.String).toBe('string');
+    const s = buildIR(await loadSchema(sdlPath), resolveScalars({ ID: 'PostId' }));
+    expect(s.scalars.ID).toEqual({ input: 'PostId', output: 'PostId' });
+    expect(s.scalars.String).toEqual({ input: 'string', output: 'string' });
+  });
+
+  it('carries the scalar prelude through to the IR', async () => {
+    const s = buildIR(await loadSchema(sdlPath), resolveScalars({ ID: { name: 'PostId', from: './ids' } }));
+    expect(s.scalarPrelude.imports).toEqual([{ name: 'PostId', from: './ids' }]);
   });
 
   it('builds the scalars map with a null prototype, so a scalar named "toString" cannot resolve via Object.prototype', async () => {
