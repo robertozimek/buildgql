@@ -49,6 +49,55 @@ it('applies scalar overrides from config', async () => {
   expect(await readFile(out, 'utf8')).toContain("leafField<'id', ['!'], MyId>");
 });
 
+it('rewrites a config-relative scalar import against the output directory', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await writeFile(join(dir, 'schema.graphql'), await readFile(sdlPath, 'utf8'));
+  const out = await generate(
+    {
+      schema: './schema.graphql',
+      output: './src/gql',
+      scalars: { ID: { name: 'PostId', from: './src/types/ids' } },
+    },
+    dir,
+  );
+  // `from` is written against the config file; the generated module lives two levels deeper.
+  expect(await readFile(out, 'utf8')).toContain("import type { PostId } from '../types/ids';");
+});
+
+it('leaves a package specifier alone, so a published generated module still resolves it', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await writeFile(join(dir, 'schema.graphql'), await readFile(sdlPath, 'utf8'));
+  const out = await generate(
+    {
+      schema: './schema.graphql',
+      output: './src/gql',
+      scalars: { ID: { name: 'JsonValue', from: '@myorg/domain-types' } },
+    },
+    dir,
+  );
+  expect(await readFile(out, 'utf8')).toContain("import type { JsonValue } from '@myorg/domain-types';");
+});
+
+it('tells the user which type modules the generated module now imports from', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await writeFile(join(dir, 'schema.graphql'), await readFile(sdlPath, 'utf8'));
+  const reporter = collectingReporter();
+  await generate(
+    { schema: './schema.graphql', output: '.', scalars: { ID: { name: 'PostId', from: './ids' } } },
+    dir,
+    reporter,
+  );
+  expect(reporter.infos.join('\n')).toContain('./ids');
+});
+
+it('says nothing about scalar imports when no scalar declares one', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
+  await writeFile(join(dir, 'schema.graphql'), await readFile(sdlPath, 'utf8'));
+  const reporter = collectingReporter();
+  await generate({ schema: './schema.graphql', output: '.', scalars: { ID: 'string' } }, dir, reporter);
+  expect(reporter.infos.join('\n')).not.toContain('import');
+});
+
 it('warns by name about a custom scalar with no entry in "scalars"', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'buildql-cli-'));
   await writeFile(join(dir, 'schema.graphql'), 'scalar DateTime\n\ntype Query {\n  now: DateTime!\n}\n');
