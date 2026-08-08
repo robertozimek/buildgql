@@ -53,18 +53,13 @@ describe('toOutputRelativeSpecifier', () => {
   });
 
   it('throws when cross-drive Windows paths cannot be related', () => {
-    // Simulate Windows path module where C: and D: have no shared base.
-    // Windows path.relative returns the target's absolute path when drives differ.
+    // Use Node's real win32 path module: win32.relative('D:\\out', 'C:\\repo\\src\\types\\money')
+    // returns 'C:\\repo\\src\\types\\money' unchanged because the drives differ, and
+    // win32.isAbsolute detects it as absolute.
     const crossDrive: PathModule = {
-      isAbsolute: (p) => /^[a-z]:/i.test(p),
+      isAbsolute: win32.isAbsolute,
       resolve: win32.resolve,
-      relative: (from, to) => {
-        const fromDrive = from[0];
-        const toDrive = to[0];
-        // Different drives: return target unchanged, which isAbsolute will detect.
-        if (fromDrive !== toDrive) return to;
-        return win32.relative(from, to);
-      },
+      relative: win32.relative,
       sep: '\\',
     };
     expect(() => toOutputRelativeSpecifier('./src/types/money', 'C:\\repo', 'D:\\out', crossDrive)).toThrow(
