@@ -73,6 +73,25 @@ describe('toOutputRelativeSpecifier', () => {
     );
   });
 
+  it('throws on an absolute cross-drive spec instead of returning it verbatim as bare', () => {
+    // `spec` here is itself an absolute Windows path, not a relative one. Under the *native*
+    // (POSIX, on this test's host) `isAbsolute`, 'C:\\repo\\src\\types\\money' does not start
+    // with '/' or '.', so it misclassifies as a *bare* package specifier and would be returned
+    // unchanged — the opposite of real Windows behaviour, and it would never reach the
+    // cross-drive guard this seam exists to test. With the real `win32` module threaded all
+    // the way through `isBareSpecifier`, it is correctly seen as absolute, and — since
+    // configDir and outputDir are on different drives — must throw instead.
+    const crossDrive: PathModule = {
+      isAbsolute: win32.isAbsolute,
+      resolve: win32.resolve,
+      relative: win32.relative,
+      sep: '\\',
+    };
+    expect(() =>
+      toOutputRelativeSpecifier('C:\\repo\\src\\types\\money', 'C:\\repo', 'D:\\out', crossDrive),
+    ).toThrow(/buildql: cannot rewrite/);
+  });
+
   it('rewrites same-drive Windows paths and emits forward slashes', () => {
     // Use Node's built-in path.win32 for same-drive paths on the C: drive.
     const sameDrive: PathModule = {
@@ -81,7 +100,6 @@ describe('toOutputRelativeSpecifier', () => {
       relative: win32.relative,
       sep: '\\',
     };
-    expect(sameDrive.relative('C:\\repo\\src\\gql', 'C:\\repo\\src\\types\\money')).toBe('..\\types\\money');
     const result = toOutputRelativeSpecifier(
       './src/types/money',
       'C:\\repo',

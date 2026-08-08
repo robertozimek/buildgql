@@ -176,20 +176,24 @@ points at source files that will not exist inside the published package, so use 
 - **a package specifier** — `from: '@myorg/domain-types'`. Resolves from inside the
   published package, provided that package is a dependency of it.
 
-buildql prints which modules the generated file imports scalar types from, so a
-mis-pointed path shows up at generate time rather than at your consumers' `tsc`.
+buildql prints the modules the generated file imports scalar types from, so you can
+eyeball a mis-pointed path at generate time. It does not check that they resolve — that
+still surfaces at your consumers' `tsc`.
 
 ### What buildql will refuse
 
 The config is validated before anything is generated: an unknown key (`ouput`), a `name`
-that isn't a bare identifier (ASCII letters/digits/`_`/`$`, not starting with a digit —
-this is a character-shape check, not a reserved-word check, so `name: 'default'` still
-gets through and only fails once TypeScript compiles the generated file), `from` and
-`declare` together, or `name` and `from`/`declare` used without one another — a `name`
-with neither, or a `from`/`declare` with no `name` to hang it on. It also refuses a `name`
-that collides with something the generated module already binds — a schema type, an
-enum's `…Values`, a `…Fragment` helper — rather than emitting a file with a duplicate
-identifier in it.
+that isn't a bare identifier (ASCII letters/digits/`_`/`$`, not starting with a digit), or
+a `name` that is a reserved word or a predefined TypeScript type name (`default`, `class`,
+`string`, `void`, and the like) — both are rejected before generation rather than surfacing
+as a syntax error in a generated file. Also refused: `from` and `declare` together, `name`
+and `from`/`declare` used without one another (a `name` with neither, or a `from`/`declare`
+with no `name` to hang it on), and a `from` containing a quote, backslash, or newline (it is
+spliced into a quoted module specifier). It also refuses a `name` that collides with
+something the generated module already binds — not just a schema type, an enum's `…Values`,
+or a `…Fragment` helper, but also the runtime helpers and client bindings the generated
+module itself imports (e.g. `query`, `mutation`, `$`, `v`) — rather than emitting a file
+with a duplicate identifier in it.
 
 ## Fragments, unions, directives
 

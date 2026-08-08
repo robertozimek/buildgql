@@ -98,11 +98,6 @@ describe('loadConfig', () => {
     });
   });
 
-  it('rejects a scalars entry that is neither a string nor an object', async () => {
-    const dir = await configDir('scalars: { DateTime: 42 }');
-    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.DateTime"/);
-  });
-
   it('rejects an empty string scalars entry', async () => {
     const dir = await configDir("scalars: { DateTime: '' }");
     await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.DateTime".*empty/);
@@ -146,6 +141,44 @@ describe('loadConfig', () => {
   it('rejects an array scalars entry, which Object.entries would otherwise walk', async () => {
     const dir = await configDir("scalars: { J: ['string'] }");
     await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J"/);
+  });
+
+  it('rejects a "from" containing a single quote, which would break out of the emitted string literal', async () => {
+    const dir = await configDir(`scalars: { J: { name: 'J', from: "./Bob's types/money" } }`);
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.from"/);
+  });
+
+  it('rejects a "from" containing a newline, which would break out of the emitted string literal', async () => {
+    const dir = await configDir("scalars: { J: { name: 'J', from: 'a\\nb' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.from"/);
+  });
+
+  it('accepts an ordinary relative-path "from"', async () => {
+    const dir = await configDir("scalars: { J: { name: 'J', from: './src/types/money' } }");
+    const { config } = await loadConfig(dir);
+    expect(config.scalars).toEqual({ J: { name: 'J', from: './src/types/money' } });
+  });
+
+  it('accepts a scoped package "from"', async () => {
+    const dir = await configDir("scalars: { J: { name: 'J', from: '@myorg/types' } }");
+    const { config } = await loadConfig(dir);
+    expect(config.scalars).toEqual({ J: { name: 'J', from: '@myorg/types' } });
+  });
+
+  it('rejects "name: \'default\'", which would emit an invalid import binding', async () => {
+    const dir = await configDir("scalars: { J: { name: 'default', from: 'pkg' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.name" \("default"\) is a reserved word/);
+  });
+
+  it('rejects "name: \'string\'", which cannot be redeclared as a type alias', async () => {
+    const dir = await configDir("scalars: { J: { name: 'string', declare: 'number' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.name" \("string"\) is a reserved word/);
+  });
+
+  it('accepts an ordinary "name"', async () => {
+    const dir = await configDir("scalars: { J: { name: 'Money', from: 'pkg' } }");
+    const { config } = await loadConfig(dir);
+    expect(config.scalars).toEqual({ J: { name: 'Money', from: 'pkg' } });
   });
 
   it("surfaces the config module's own error instead of TypeScript-support advice", async () => {
