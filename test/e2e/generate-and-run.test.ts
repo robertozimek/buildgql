@@ -249,3 +249,120 @@ toUrqlArgs(byStatus, { status: 'ARCHIVED' });
     postsByStatus: [{ id: 'p1', title: 'Hello', status: 'PUBLISHED' }],
   });
 }, 60_000);
+
+it('maps complex scalars through the import, declare and split input/output forms', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'buildql-e2e-scalars-'));
+
+  // Lives at the temp-dir root while the module is generated into `gql/`, so a `from` of
+  // './types' — written against the config — must come out of the emitter as '../types'.
+  // This is the path rewrite proven on a real filesystem, not just in path arithmetic.
+  await writeFile(
+    join(dir, 'types.ts'),
+    'export interface Money {\n  readonly amount: number;\n  readonly currency: string;\n}\n',
+  );
+
+  const file = await generate(
+    {
+      schema: server.url,
+      output: './gql',
+      scalars: {
+        Money: { name: 'Money', from: './types' },
+        Metadata: {
+          name: 'Metadata',
+          declare: '{ readonly tags: readonly string[]; readonly views: number }',
+        },
+        // The wire form is a string, but an argument may also be given as epoch millis.
+        Timestamp: { input: 'string | number', output: 'string' },
+      },
+    },
+    dir,
+  );
+
+  const src = await readFile(file, 'utf8');
+  expect(src).toContain("import type { Money } from '../types';");
+  expect(src).toContain(
+    'export type Metadata = { readonly tags: readonly string[]; readonly views: number };',
+  );
+  // Split positions: the result takes `output`, the argument takes `input`. The base is
+  // parenthesized because `inputTsType` always guards a non-atomic base before appending
+  // `| null` — see `test/unit/ts-types.test.ts` and `test/unit/emit.test.ts` for the pinned,
+  // pre-existing behavior this mirrors.
+  expect(src).toContain("updatedAt: leafField<'updatedAt', ['!'], string>('updatedAt', ['!'])");
+  expect(src).toContain('since?: (string | number) | null');
+
+  await writeFile(file, src.replace("from 'buildql'", `from '${srcIndexPath}'`));
+
+  const usage = join(dir, 'gql', 'usage.ts');
+  await writeFile(
+    usage,
+    `import type { RESULT, VARS } from 'buildql';
+import { query } from './index.js';
+import type { Metadata } from './index.js';
+import type { Money } from '../types';
+
+export const meta = query('PostMeta', ($, Q) => [
+  Q.postMeta({ id: $.id, since: $.since }, (M) => [M.id, M.metadata, M.updatedAt, M.price]),
+]);
+
+type Expect<T extends true> = T;
+type Eq<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
+type MetaSelected = NonNullable<(typeof meta)[typeof RESULT]>['postMeta'];
+
+// The declared type and the imported type must both flow all the way into the result type —
+// this is the whole point of the feature, checked by tsc rather than by string matching.
+export type _ResultUsesScalarTypes = Expect<
+  Eq<MetaSelected, { id: string; metadata: Metadata; updatedAt: string; price: Money }>
+>;
+
+// The split input type must reach the variables object: \`since\` accepts both forms. Checked
+// against the operation's own inferred variables type (via the exported \`VARS\` phantom, the
+// same mechanism \`MetaSelected\` above uses via \`RESULT\`) so a regression that narrows
+// \`since\` back to a single type fails to compile here, not just in a disconnected literal.
+type MetaVars = NonNullable<(typeof meta)[typeof VARS]>;
+export const asString: MetaVars = { id: 'p1', since: '2026-08-07T00:00:00.000Z' };
+export const asNumber: MetaVars = { id: 'p1', since: 0 };
+`,
+  );
+
+  await writeFile(
+    join(dir, 'tsconfig.json'),
+    JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        noEmit: true,
+        target: 'ES2020',
+        module: 'ESNext',
+        moduleResolution: 'bundler',
+        skipLibCheck: true,
+        allowImportingTsExtensions: true,
+        paths: { buildql: [srcIndexPath] },
+      },
+      include: ['types.ts', 'gql/index.ts', 'gql/usage.ts'],
+    }),
+  );
+
+  const tsc = new URL('../../node_modules/typescript/bin/tsc', import.meta.url).pathname;
+  await expect(run(process.execPath, [tsc, '-p', join(dir, 'tsconfig.json')])).resolves.toBeTruthy();
+
+  type MetaResult = {
+    postMeta: {
+      id: string;
+      metadata: { readonly tags: readonly string[]; readonly views: number };
+      updatedAt: string;
+      price: { readonly amount: number; readonly currency: string };
+    };
+  };
+  const mod = (await import(pathToFileURL(usage).href)) as {
+    readonly meta: Operation<MetaResult, { id: string; since?: string | number | null }>;
+  };
+
+  const client = createClient({ url: server.url });
+  expect(await client.execute(mod.meta, { id: 'p1', since: 0 })).toEqual({
+    postMeta: {
+      id: 'p1',
+      metadata: { tags: ['a', 'b'], views: 42 },
+      updatedAt: '2026-08-07T00:00:00.000Z',
+      price: { amount: 999, currency: 'USD' },
+    },
+  });
+}, 60_000);

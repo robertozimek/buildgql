@@ -1,3 +1,4 @@
+import { GraphQLScalarType } from 'graphql';
 import { createSchema, createYoga } from 'graphql-yoga';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -8,6 +9,7 @@ const typeDefs = /* GraphQL */ `
     post(id: ID!): Post
     postsByStatus(status: Status!): [Post!]!
     pet: Pet!
+    postMeta(id: ID!, since: Timestamp): PostMeta!
   }
   type Mutation {
     createUser(name: String!, email: String!, age: Int): User!
@@ -36,7 +38,26 @@ const typeDefs = /* GraphQL */ `
     name: String!
     lives: Int!
   }
+  type PostMeta {
+    id: ID!
+    metadata: Metadata!
+    updatedAt: Timestamp!
+    price: Money!
+  }
+  scalar Money
+  scalar Metadata
+  scalar Timestamp
 `;
+
+/**
+ * A custom scalar that transports its JSON value untouched. Enough for a codegen end-to-end:
+ * what is under test is the *types* buildql generates for a scalar, not the server's coercion.
+ * `parseLiteral` is left at its default (`valueFromASTUntyped`), which already handles object
+ * and list literals.
+ */
+function passthroughScalar(name: string): GraphQLScalarType {
+  return new GraphQLScalarType({ name, serialize: (v: unknown) => v, parseValue: (v: unknown) => v });
+}
 
 const users = [{ id: 'u1', firstName: 'Ada', lastName: null }];
 const posts = [
@@ -54,6 +75,12 @@ export async function startServer(): Promise<{ url: string; stop: () => Promise<
           post: (_: unknown, a: { id: string }) => posts.find((p) => p.id === a.id) ?? null,
           postsByStatus: (_: unknown, a: { status: string }) => posts.filter((p) => p.status === a.status),
           pet: () => ({ __typename: 'Dog', name: 'Rex', breed: 'Corgi' }),
+          postMeta: (_: unknown, a: { id: string }) => ({
+            id: a.id,
+            metadata: { tags: ['a', 'b'], views: 42 },
+            updatedAt: '2026-08-07T00:00:00.000Z',
+            price: { amount: 999, currency: 'USD' },
+          }),
         },
         Mutation: {
           createUser: (_: unknown, a: { name: string; email: string }) => ({
@@ -62,6 +89,9 @@ export async function startServer(): Promise<{ url: string; stop: () => Promise<
             lastName: null,
           }),
         },
+        Money: passthroughScalar('Money'),
+        Metadata: passthroughScalar('Metadata'),
+        Timestamp: passthroughScalar('Timestamp'),
       },
     }),
     logging: false,
