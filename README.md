@@ -65,6 +65,7 @@ export default defineConfig({
   // ...or a local file: './schema.graphql' or './introspection.json'
 
   output: './src/gql',
+  // See "Custom scalars" below for object-typed scalars.
   scalars: { DateTime: 'string', JSON: 'unknown' },
 
   // 'buildql' (default) | 'apollo' | 'urql' | 'none' — see "Using Apollo or urql"
@@ -111,6 +112,84 @@ literal (e.g. `{ filter: { status: 'PUBLISHED' } }`) — the printer has no view
 the input type graph at that depth, so it falls back to a quoted string there. If
 you hit this, pass the value as a variable instead (`{ filter: $.filter }`); JSON
 variable transport encodes enums correctly regardless of nesting.
+
+## Custom scalars
+
+Every scalar outside GraphQL's built-in five (`ID`, `String`, `Int`, `Float`, `Boolean`)
+needs an entry in `scalars`, or it generates as `unknown` (and buildql warns, by name,
+when it does). The simplest entry is a raw TypeScript type expression, used in both
+argument and result position:
+
+```js
+scalars: { DateTime: 'string', JSON: 'unknown' }
+```
+
+For scalars a single expression cannot express, an entry can be an object instead.
+
+**Different types in and out.** A `DateTime` you may _pass_ as a `Date` but always _read
+back_ as an ISO string:
+
+```js
+scalars: { DateTime: { input: 'string | Date', output: 'string' } }
+```
+
+**A type you already have.** `from` imports it; the generated module gets an
+`import type` line, so there is no runtime dependency on that module:
+
+```js
+scalars: { Money: { name: 'Money', from: './src/types/money' } }
+```
+
+**A type declared inline.** `declare` is the right-hand side of a type alias; buildql
+emits `export type <name> = ...` into the generated module, so your own code can import
+the type from there too:
+
+```js
+scalars: {
+  JSON: {
+    name: 'JSONValue',
+    declare: 'string | number | boolean | null | JSONValue[] | { [k: string]: JSONValue }',
+  },
+}
+```
+
+`name` can be combined with `input`/`output` to widen one position while still importing
+or declaring the type: `{ name: 'Money', from: './money', input: 'Money | string' }`.
+`from` and `declare` are mutually exclusive.
+
+### Where does `from` point?
+
+A **package specifier** (`type-fest`, `@myorg/domain-types`) is emitted verbatim.
+
+A **relative or absolute path** is written against _your config file_ — the same as
+`schema` and `output` — and buildql rewrites it to be relative to `output`. With
+`output: './src/gql'`, a `from` of `'./src/types/money'` is emitted as `'../types/money'`.
+Extensions are preserved exactly as written, so `nodenext` projects can write
+`'./src/types/money.js'`.
+
+**Publishing the generated module as an npm package?** (Generating in the backend repo
+during CI and shipping an SDK to your frontends is a common setup.) A relative path
+points at source files that will not exist inside the published package, so use one of:
+
+- **`declare`** — the type is inlined into the generated module. Nothing to resolve, no
+  dependency to declare. This is the safest default for a published SDK.
+- **a package specifier** — `from: '@myorg/domain-types'`. Resolves from inside the
+  published package, provided that package is a dependency of it.
+
+buildql prints which modules the generated file imports scalar types from, so a
+mis-pointed path shows up at generate time rather than at your consumers' `tsc`.
+
+### What buildql will refuse
+
+The config is validated before anything is generated: an unknown key (`ouput`), a `name`
+that isn't a bare identifier (ASCII letters/digits/`_`/`$`, not starting with a digit —
+this is a character-shape check, not a reserved-word check, so `name: 'default'` still
+gets through and only fails once TypeScript compiles the generated file), `from` and
+`declare` together, or `name` and `from`/`declare` used without one another — a `name`
+with neither, or a `from`/`declare` with no `name` to hang it on. It also refuses a `name`
+that collides with something the generated module already binds — a schema type, an
+enum's `…Values`, a `…Fragment` helper — rather than emitting a file with a duplicate
+identifier in it.
 
 ## Fragments, unions, directives
 
