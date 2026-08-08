@@ -1,5 +1,10 @@
+import { win32 } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { isBareSpecifier, toOutputRelativeSpecifier } from '../../src/codegen/scalar-imports.js';
+import {
+  isBareSpecifier,
+  toOutputRelativeSpecifier,
+  type PathModule,
+} from '../../src/codegen/scalar-imports.js';
 
 describe('isBareSpecifier', () => {
   it('recognises package specifiers', () => {
@@ -45,5 +50,51 @@ describe('toOutputRelativeSpecifier', () => {
 
   it('emits forward slashes regardless of the host platform', () => {
     expect(toOutputRelativeSpecifier('./a/b/c/money', '/repo', '/repo/gen')).not.toContain('\\');
+  });
+
+  it('throws when cross-drive Windows paths cannot be related', () => {
+    // Simulate Windows path module where C: and D: have no shared base.
+    // Windows path.relative returns the target's absolute path when drives differ.
+    const crossDrive: PathModule = {
+      isAbsolute: (p) => /^[a-z]:/i.test(p),
+      resolve: win32.resolve,
+      relative: (from, to) => {
+        const fromDrive = from[0];
+        const toDrive = to[0];
+        // Different drives: return target unchanged, which isAbsolute will detect.
+        if (fromDrive !== toDrive) return to;
+        return win32.relative(from, to);
+      },
+      sep: '\\',
+    };
+    expect(() => toOutputRelativeSpecifier('./src/types/money', 'C:\\repo', 'D:\\out', crossDrive)).toThrow(
+      /buildql: cannot rewrite/,
+    );
+    expect(() => toOutputRelativeSpecifier('./src/types/money', 'C:\\repo', 'D:\\out', crossDrive)).toThrow(
+      /C:\\repo/,
+    );
+    expect(() => toOutputRelativeSpecifier('./src/types/money', 'C:\\repo', 'D:\\out', crossDrive)).toThrow(
+      /D:\\out/,
+    );
+  });
+
+  it('rewrites same-drive Windows paths and emits forward slashes', () => {
+    // Use Node's built-in path.win32 for same-drive paths on the C: drive.
+    const sameDrive: PathModule = {
+      isAbsolute: win32.isAbsolute,
+      resolve: win32.resolve,
+      relative: win32.relative,
+      sep: '\\',
+    };
+    expect(sameDrive.relative('C:\\repo\\src\\gql', 'C:\\repo\\src\\types\\money')).toBe('..\\types\\money');
+    const result = toOutputRelativeSpecifier(
+      './src/types/money',
+      'C:\\repo',
+      'C:\\repo\\src\\gql',
+      sameDrive,
+    );
+    expect(result).toBe('../types/money');
+    // Verify forward slashes, not backslashes.
+    expect(result).not.toContain('\\');
   });
 });
