@@ -92,12 +92,9 @@ export function inputTsType(ref: IRTypeRef, ir: IRSchema): string {
       ? ref.name
       : (scalarTsType(ir, ref.name)?.input ?? UNKNOWN_SCALAR);
   // Walk the wrapper inner-to-outer, mirroring Apply<> from the runtime.
-  // Only the base needs the atomicity guard, and only if a `[]` will actually land on
-  // it: a bare non-null/nullable ref (no list anywhere in `wrap`) never gets `[]`
-  // appended, and a trailing `| null` binds no tighter than the base's own top-level
-  // `|`/`&`, so guarding it would only add parens no reader or compiler needs.
-  const needsGuard = ref.wrap.includes('l');
-  let out = needsGuard && !isAtomicTypeExpression(base) ? `(${base})` : base;
+  // Only the base needs the atomicity guard: every later iteration appends to a
+  // string already ending in `[]`, which binds tightly on its own.
+  let out = isAtomicTypeExpression(base) ? base : `(${base})`;
   const toks = [...ref.wrap].reverse();
   let nonNull = false;
   for (const tok of toks) {
