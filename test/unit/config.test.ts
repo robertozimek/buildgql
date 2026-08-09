@@ -175,6 +175,11 @@ describe('loadConfig', () => {
     await expect(loadConfig(dir)).rejects.toThrow(/"scalars\.J\.name" \("string"\) is a reserved word/);
   });
 
+  it('rejects "name: \'as\'", which would emit an invalid type alias ("export type as = ...")', async () => {
+    const dir = await configDir("scalars: { J: { name: 'as', declare: 'Foo' } }");
+    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars\.J\.name" \("as"\) is a reserved word/);
+  });
+
   it('accepts an ordinary "name"', async () => {
     const dir = await configDir("scalars: { J: { name: 'Money', from: 'pkg' } }");
     const { config } = await loadConfig(dir);
