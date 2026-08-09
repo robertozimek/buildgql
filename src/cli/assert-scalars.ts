@@ -16,9 +16,18 @@ const SCALAR_KEYS = [
   'output',
 ] as const satisfies readonly (keyof ScalarTypeConfig)[];
 
+/**
+ * Fails to compile unless `T` is `never` — the `extends never` constraint is what does the
+ * work: instantiating this alias with anything else is a type error, not a value the alias
+ * silently resolves to. A bare `X extends never ? true : never` alias, by contrast, always
+ * type-checks regardless of which branch it takes, because nothing requires callers to check
+ * that `X` came out `true` — that shape was tried here and confirmed to let a real key omission
+ * through `tsc --strict --noEmit` with zero diagnostics.
+ */
+type AssertNever<T extends never> = T;
+
 /** Fails to compile if a key is added to `ScalarTypeConfig` without being added to `SCALAR_KEYS`. */
-export type AllScalarKeysListed =
-  Exclude<keyof ScalarTypeConfig, (typeof SCALAR_KEYS)[number]> extends never ? true : never;
+export type AllScalarKeysListed = AssertNever<Exclude<keyof ScalarTypeConfig, (typeof SCALAR_KEYS)[number]>>;
 
 /**
  * What `name` must look like to be spliced into `import type { <name> }` / `export type <name>`.
@@ -43,7 +52,9 @@ const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
  *   used with either `from` or `declare`, both are rejected here regardless of which one
  *   the entry actually sets. `null` and `void` are reserved words already covered by the
  *   first bucket above; TypeScript separately reports TS2457 for them too, so they would
- *   land in this set either way.
+ *   land in this set either way. `as` lands here for the same reason as the predefined
+ *   type names: `import type { as }` parses fine, but `export type as = ...` fails with
+ *   TS1005, so it is rejected regardless of which position `name` is actually used in.
  */
 const RESERVED_NAMES = new Set([
   'break',
@@ -102,6 +113,7 @@ const RESERVED_NAMES = new Set([
   'symbol',
   'undefined',
   'unknown',
+  'as',
 ]);
 
 /**
