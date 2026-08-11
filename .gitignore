@@ -11,3 +11,8 @@ package/
 
 # Lavish review surfaces — scratch HTML for reviewing plans, not project content.
 .lavish/
+
+# Superpowers working files — agent skill state and implementation plans, not
+# project content. Never track these.
+.superpowers/
+docs/superpowers/
