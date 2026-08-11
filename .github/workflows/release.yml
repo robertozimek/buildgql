@@ -31,12 +31,20 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, not the 20 that ci.yml checks against, because trusted publishing needs
+          # Node >= 22.14. The gate below therefore runs on a newer Node than CI does;
+          # that is the point of running it here at all, and `engines` still declares >= 18.
+          #
+          # No `registry-url`: it exists to write an .npmrc containing
+          # `_authToken=${NODE_AUTH_TOKEN}`, and there is no token here to write.
+          node-version: 22
           cache: npm
-          # Writes the .npmrc that points at the public registry and reads NODE_AUTH_TOKEN.
-          # Without it `npm publish` uses whatever registry the runner defaults to and
-          # ignores the secret entirely.
-          registry-url: https://registry.npmjs.org
+
+      - name: npm >= 11.5.1, which is what can exchange the OIDC token
+        # Node 22 ships npm 10.9, and OIDC publishing did not exist until 11.5.1 — without
+        # this the publish step falls back to looking for credentials it will not find, and
+        # fails with an auth error that says nothing about the real cause.
+        run: npm install --global npm@latest
 
       - run: npm ci
 
@@ -64,13 +72,19 @@ jobs:
         run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
 
       - name: Publish to npm
+        # Authenticated by TRUSTED PUBLISHING: npm exchanges the workflow's OIDC token for a
+        # short-lived, package-scoped credential. There is deliberately no NPM_TOKEN secret
+        # in this repository — a CI token is a long-lived credential that bypasses the
+        # account's 2FA, which is the thing npm now warns about when you create one.
+        #
+        # Nothing here names the trusted publisher; the trust relationship is configured on
+        # npmjs.com against this repository AND this workflow's filename. Renaming this file
+        # breaks publishing until the setting is updated to match.
+        #
+        # No `--provenance` flag: trusted publishing attaches provenance by default. `--access
+        # public` is redundant with `publishConfig` in package.json and stated anyway, since
+        # the cost of the two disagreeing is a publish that fails for every consumer.
+        #
         # `prepack` rebuilds `dist` as part of `npm publish`, so the tarball is always built
         # from this checkout — `dist` is gitignored and never comes from the repository.
-        #
-        # `--provenance` attaches a signed statement linking the tarball to this workflow
-        # run and this commit, which npm shows on the package page. `--access public` is
-        # redundant with `publishConfig` in package.json and stated anyway: the cost of the
-        # two disagreeing is a private publish that silently fails for every consumer.
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

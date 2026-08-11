@@ -66,13 +66,29 @@ Publishing is done by `.github/workflows/release.yml`, triggered by a version ta
 by hand, so that every published tarball is built by CI from a known commit and carries an
 npm provenance attestation.
 
-One-time setup on the repository: add an npm **granular access token** with publish rights
-to `buildql` as the `NPM_TOKEN` secret. Once the package exists on npm you can replace the
-token with a [trusted publisher](https://docs.npmjs.com/trusted-publishers) pointing at
-this workflow, and delete the secret — the workflow already requests the `id-token`
-permission that trusted publishing relies on.
+The workflow authenticates with
+[trusted publishing](https://docs.npmjs.com/trusted-publishers): npm exchanges the
+workflow's OIDC token for a short-lived, package-scoped credential. **This repository holds
+no npm token, and should not be given one.** A CI token is a long-lived credential that
+bypasses the account's 2FA — npm itself now warns about that when you create one — and it
+is exactly what trusted publishing exists to remove.
 
-To cut a release:
+### One-time setup
+
+OIDC cannot publish a package that does not yet exist: npmjs.com only exposes trusted
+publisher settings on an existing package ([npm/cli#8544](https://github.com/npm/cli/issues/8544)).
+So the very first version is published by hand, and every version after it by the workflow.
+
+1. `npm login`, then `npm publish` from a clean checkout of the tagged commit. This prompts
+   for a 2FA one-time password; no token is created at any point. (This one release has no
+   provenance attestation — nothing published from a laptop can have one.)
+2. On npmjs.com: **buildql → Settings → Trusted publisher →** GitHub Actions, repository
+   `robertozimek/buildql`, workflow filename `release.yml`. The filename must match exactly;
+   renaming the workflow breaks publishing until this is updated.
+3. Same page, **Publishing access → Require two-factor authentication or trusted publishing**.
+   That is what actually forbids a token from publishing, rather than merely not having one.
+
+### Cutting a release
 
 ```bash
 npm version patch   # or minor / major — writes package.json and creates the v* tag
@@ -80,7 +96,9 @@ git push --follow-tags
 ```
 
 The workflow refuses to publish if the tag and `package.json` disagree, then runs the full
-`npm run check` gate before publishing. `prepack` rebuilds `dist/` as part of `npm publish`,
+`npm run check` gate before publishing — on Node 22, since trusted publishing needs
+Node >= 22.14 and npm >= 11.5.1 (Node 22 ships npm 10.9, so the workflow upgrades npm
+itself). `engines` still declares Node >= 18 for consumers, and `ci.yml` still checks on 20. `prepack` rebuilds `dist/` as part of `npm publish`,
 so the tarball never depends on whatever happened to be in a working tree — `dist/` is
 gitignored and `files` ships nothing else.
 
