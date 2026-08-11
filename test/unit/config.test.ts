@@ -14,73 +14,73 @@ describe('defineConfig', () => {
 });
 
 describe('loadConfig', () => {
-  it('loads buildql.config.mjs', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+  it('loads buildgql.config.mjs', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', output: './gen' };\n",
     );
     const { config, path } = await loadConfig(dir);
     expect(config.schema).toBe('./schema.graphql');
     expect(config.output).toBe('./gen');
-    expect(path).toContain('buildql.config.mjs');
+    expect(path).toContain('buildgql.config.mjs');
   });
 
   it('errors clearly when no config exists', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql\.config\.(ts|js)/);
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    await expect(loadConfig(dir)).rejects.toThrow(/buildgql\.config\.(ts|js)/);
   });
 
   it('errors clearly when schema is missing', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(join(dir, 'buildql.config.mjs'), 'export default {};\n');
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    await writeFile(join(dir, 'buildgql.config.mjs'), 'export default {};\n');
     await expect(loadConfig(dir)).rejects.toThrow(/"schema"/);
   });
 
   it('errors clearly when the default export is not an object', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(join(dir, 'buildql.config.mjs'), "export default './schema.graphql';\n");
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*default export must be an object/);
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    await writeFile(join(dir, 'buildgql.config.mjs'), "export default './schema.graphql';\n");
+    await expect(loadConfig(dir)).rejects.toThrow(/buildgql:.*default export must be an object/);
   });
 
   it('errors clearly when schema is not a string', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(join(dir, 'buildql.config.mjs'), 'export default { schema: 42 };\n');
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    await writeFile(join(dir, 'buildgql.config.mjs'), 'export default { schema: 42 };\n');
     await expect(loadConfig(dir)).rejects.toThrow(/"schema"/);
   });
 
   it('errors clearly when output is not a string', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', output: 42 };\n",
     );
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"output"/);
+    await expect(loadConfig(dir)).rejects.toThrow(/buildgql:.*"output"/);
   });
 
   it('errors clearly when headers is not a string record', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', headers: { Authorization: 42 } };\n",
     );
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"headers"/);
+    await expect(loadConfig(dir)).rejects.toThrow(/buildgql:.*"headers"/);
   });
 
   it('errors clearly when a scalars entry is neither a string nor an object', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', scalars: { DateTime: 42 } };\n",
     );
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars\.DateTime"/);
+    await expect(loadConfig(dir)).rejects.toThrow(/buildgql:.*"scalars\.DateTime"/);
   });
 
-  /** Writes `source` as the default export of a buildql.config.mjs in a fresh temp dir. */
+  /** Writes `source` as the default export of a buildgql.config.mjs in a fresh temp dir. */
   async function configDir(source: string): Promise<string> {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       `export default { schema: './s.graphql', ${source} };\n`,
     );
     return dir;
@@ -177,7 +177,9 @@ describe('loadConfig', () => {
 
   it('rejects "name: \'as\'", which would emit an invalid type alias ("export type as = ...")', async () => {
     const dir = await configDir("scalars: { J: { name: 'as', declare: 'Foo' } }");
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"scalars\.J\.name" \("as"\) is a reserved word/);
+    await expect(loadConfig(dir)).rejects.toThrow(
+      /buildgql:.*"scalars\.J\.name" \("as"\) is a reserved word/,
+    );
   });
 
   it('accepts an ordinary "name"', async () => {
@@ -187,8 +189,8 @@ describe('loadConfig', () => {
   });
 
   it("surfaces the config module's own error instead of TypeScript-support advice", async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(join(dir, 'buildql.config.mjs'), "throw new Error('boom: DATABASE_URL is not set');\n");
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    await writeFile(join(dir, 'buildgql.config.mjs'), "throw new Error('boom: DATABASE_URL is not set');\n");
     await expect(loadConfig(dir)).rejects.toThrow(/boom: DATABASE_URL is not set/);
     await expect(loadConfig(dir)).rejects.not.toThrow(/Node must be able to run TypeScript directly/);
   });
@@ -214,12 +216,12 @@ describe('loadConfig', () => {
     return (url) => (url === pathToFileURL(brokenPath).href ? Promise.reject(err) : import(url));
   }
 
-  it('falls through to buildql.config.mjs when buildql.config.ts fails with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX (strip-only mode, non-erasable syntax)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    const tsPath = join(dir, 'buildql.config.ts');
+  it('falls through to buildgql.config.mjs when buildgql.config.ts fails with ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX (strip-only mode, non-erasable syntax)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    const tsPath = join(dir, 'buildgql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', output: './gen' };\n",
     );
 
@@ -230,15 +232,15 @@ describe('loadConfig', () => {
 
     expect(config.schema).toBe('./schema.graphql');
     expect(config.output).toBe('./gen');
-    expect(path).toContain('buildql.config.mjs');
+    expect(path).toContain('buildgql.config.mjs');
   });
 
   it('does NOT fall through — and surfaces the real error — when a .ts config has a genuine syntax error (a bare SyntaxError with no Node error code), even when a valid .mjs is also present', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    const tsPath = join(dir, 'buildql.config.ts');
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    const tsPath = join(dir, 'buildgql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './should-not-be-used.graphql' };\n",
     );
 
@@ -247,11 +249,11 @@ describe('loadConfig', () => {
     ).rejects.toThrow(/Unexpected token/);
   });
 
-  it('falls through to buildql.config.mjs when buildql.config.ts fails with ERR_UNKNOWN_FILE_EXTENSION (no native TS support at all)', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    const tsPath = join(dir, 'buildql.config.ts');
+  it('falls through to buildgql.config.mjs when buildgql.config.ts fails with ERR_UNKNOWN_FILE_EXTENSION (no native TS support at all)', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    const tsPath = join(dir, 'buildgql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
-    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+    await writeFile(join(dir, 'buildgql.config.mjs'), "export default { schema: './schema.graphql' };\n");
 
     const err = Object.assign(new Error('Unknown file extension ".ts"'), {
       code: 'ERR_UNKNOWN_FILE_EXTENSION',
@@ -259,14 +261,14 @@ describe('loadConfig', () => {
     const { config, path } = await loadConfig(dir, importModuleThrowingFor(tsPath, err));
 
     expect(config.schema).toBe('./schema.graphql');
-    expect(path).toContain('buildql.config.mjs');
+    expect(path).toContain('buildgql.config.mjs');
   });
 
   it('writes a stderr line naming the skipped file at the moment it is skipped, not deferred', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    const tsPath = join(dir, 'buildql.config.ts');
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    const tsPath = join(dir, 'buildgql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
-    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+    await writeFile(join(dir, 'buildgql.config.mjs'), "export default { schema: './schema.graphql' };\n");
 
     const err = Object.assign(new Error('Unknown file extension ".ts"'), {
       code: 'ERR_UNKNOWN_FILE_EXTENSION',
@@ -288,13 +290,13 @@ describe('loadConfig', () => {
     }
 
     const written = calls.join('');
-    expect(written).toContain('buildql.config.ts');
+    expect(written).toContain('buildgql.config.ts');
     expect(written).toMatch(/skip/i);
   });
 
   it('throws the TypeScript-support error when the only config present cannot be loaded on this Node', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    const tsPath = join(dir, 'buildql.config.ts');
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    const tsPath = join(dir, 'buildgql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
 
     const err = Object.assign(new Error('Unknown file extension ".ts"'), {
@@ -306,11 +308,11 @@ describe('loadConfig', () => {
   });
 
   it('does NOT fall through — and surfaces the real error — when a .ts config throws its own runtime error', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    const tsPath = join(dir, 'buildql.config.ts');
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    const tsPath = join(dir, 'buildgql.config.ts');
     await writeFile(tsPath, "export default { schema: './unused.graphql' };\n");
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './should-not-be-used.graphql' };\n",
     );
 
@@ -320,9 +322,9 @@ describe('loadConfig', () => {
   });
 
   it('accepts a valid client', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', client: 'apollo' };\n",
     );
     const { config } = await loadConfig(dir);
@@ -330,29 +332,29 @@ describe('loadConfig', () => {
   });
 
   it('leaves client undefined when it is not set', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
-    await writeFile(join(dir, 'buildql.config.mjs'), "export default { schema: './schema.graphql' };\n");
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
+    await writeFile(join(dir, 'buildgql.config.mjs'), "export default { schema: './schema.graphql' };\n");
     const { config } = await loadConfig(dir);
     expect(config.client).toBeUndefined();
   });
 
   it('errors clearly on an unknown client, naming the valid values', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', client: 'relay' };\n",
     );
     await expect(loadConfig(dir)).rejects.toThrow(
-      /buildql:.*"client" must be one of "buildql", "apollo", "urql", "none"/,
+      /buildgql:.*"client" must be one of "buildgql", "apollo", "urql", "none"/,
     );
   });
 
   it('errors clearly when client is not a string', async () => {
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-cfg-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-cfg-'));
     await writeFile(
-      join(dir, 'buildql.config.mjs'),
+      join(dir, 'buildgql.config.mjs'),
       "export default { schema: './schema.graphql', client: 42 };\n",
     );
-    await expect(loadConfig(dir)).rejects.toThrow(/buildql:.*"client"/);
+    await expect(loadConfig(dir)).rejects.toThrow(/buildgql:.*"client"/);
   });
 });

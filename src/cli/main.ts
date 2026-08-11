@@ -5,12 +5,12 @@ import { generate } from './generate.js';
 import { consoleReporter } from './reporter.js';
 import type { Reporter } from './reporter.js';
 
-const USAGE = `buildql — type-safe GraphQL query builder codegen
+const USAGE = `buildgql — type-safe GraphQL query builder codegen
 
 Usage:
-  buildql generate [--config <dir>]   Generate the SDK from buildql.config.*
-  buildql --help                      Show this message
-  buildql --version                   Print the version
+  buildgql generate [--config <dir>]   Generate the SDK from buildgql.config.*
+  buildgql --help                      Show this message
+  buildgql --version                   Print the version
 `;
 
 /**
@@ -22,7 +22,7 @@ Usage:
  * ships `package.json`, so the read succeeds inside an installed package too.
  *
  * Read at call time, not at module load: `bin.ts` imports this module to run ANY command,
- * and a top-level await would put a filesystem read in front of every `buildql generate`
+ * and a top-level await would put a filesystem read in front of every `buildgql generate`
  * to serve a flag it did not pass.
  */
 async function version(): Promise<string> {
@@ -45,7 +45,7 @@ export async function main(argv: string[], reporter: Reporter = consoleReporter)
     return 0;
   }
   if (cmd !== 'generate') {
-    process.stderr.write(`buildql: unknown command "${cmd}"\n\n${USAGE}`);
+    process.stderr.write(`buildgql: unknown command "${cmd}"\n\n${USAGE}`);
     return 1;
   }
 
@@ -54,17 +54,17 @@ export async function main(argv: string[], reporter: Reporter = consoleReporter)
 
   try {
     const { config, path } = await loadConfig(cwd);
-    reporter.info(`buildql: using ${path}`);
+    reporter.info(`buildgql: using ${path}`);
     const out = await generate(config, cwd, reporter);
-    reporter.info(`buildql: wrote ${out}`);
+    reporter.info(`buildgql: wrote ${out}`);
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    // Errors buildql itself throws already carry the prefix (house rule, enforced by
+    // Errors buildgql itself throws already carry the prefix (house rule, enforced by
     // review, not by a lint rule). An unwrapped Node error crossing this boundary — a raw
     // ENOENT/EACCES from the filesystem, a rejected `fetch` — would not, so it is added
     // here rather than trusted to already be there.
-    reporter.warn(message.startsWith('buildql: ') ? message : `buildql: ${message}`);
+    reporter.warn(message.startsWith('buildgql: ') ? message : `buildgql: ${message}`);
     return 1;
   }
 }

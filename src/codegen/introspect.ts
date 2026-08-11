@@ -89,7 +89,7 @@ export interface LoadOptions {
   readonly fetch?: typeof fetch;
   /**
    * The project directory to resolve the optional `graphql` peer from when it is not
-   * resolvable from buildql itself. See `importGraphql` — this exists for `npx`/`dlx`.
+   * resolvable from buildgql itself. See `importGraphql` — this exists for `npx`/`dlx`.
    */
   readonly cwd?: string | undefined;
 }
@@ -102,7 +102,7 @@ async function introspectUrl(url: string, opts: LoadOptions): Promise<Introspect
     body: JSON.stringify({ query: INTROSPECTION_QUERY, operationName: 'IntrospectionQuery' }),
   });
   if (!res.ok) {
-    throw new Error(`buildql: introspection of ${url} failed with HTTP ${res.status}`);
+    throw new Error(`buildgql: introspection of ${url} failed with HTTP ${res.status}`);
   }
   // Read the body ONCE as text and parse it by hand — a proxy or misconfigured server
   // can return an HTML error page with a 200 status, and calling `res.json()` directly
@@ -112,15 +112,15 @@ async function introspectUrl(url: string, opts: LoadOptions): Promise<Introspect
   try {
     payload = JSON.parse(raw) as { data?: IntrospectionResult; errors?: { message: string }[] };
   } catch {
-    throw new Error(`buildql: introspection of ${url} did not return valid JSON: ${raw.slice(0, 200)}`);
+    throw new Error(`buildgql: introspection of ${url} did not return valid JSON: ${raw.slice(0, 200)}`);
   }
   if (payload.errors && payload.errors.length > 0) {
     throw new Error(
-      `buildql: introspection of ${url} failed: ${payload.errors.map((e) => e.message).join('; ')}`,
+      `buildgql: introspection of ${url} failed: ${payload.errors.map((e) => e.message).join('; ')}`,
     );
   }
   if (!payload.data?.__schema) {
-    throw new Error(`buildql: introspection of ${url} returned no __schema`);
+    throw new Error(`buildgql: introspection of ${url} returned no __schema`);
   }
   return payload.data;
 }
@@ -133,12 +133,12 @@ function isGraphqlModule(value: unknown): value is typeof GraphqlModule {
 }
 
 /**
- * The optional `graphql` peer, resolved from buildql first and from the user's project
+ * The optional `graphql` peer, resolved from buildgql first and from the user's project
  * second.
  *
- * The second half exists for `npx buildql` / `pnpm dlx buildql`, which is how most people
+ * The second half exists for `npx buildgql` / `pnpm dlx buildgql`, which is how most people
  * will run the CLI the first time. Under npx the binary lives in a throwaway cache
- * directory (`~/.npm/_npx/<hash>/node_modules/buildql/dist/cli/bin.js`), and Node resolves
+ * directory (`~/.npm/_npx/<hash>/node_modules/buildgql/dist/cli/bin.js`), and Node resolves
  * a bare specifier by walking up from the IMPORTING file — so `import('graphql')` searches
  * the npx cache and stops there. npm does not install optional peers, so it never finds
  * one, and the project's own `graphql` two directories away in the user's cwd is invisible
@@ -152,7 +152,7 @@ function isGraphqlModule(value: unknown): value is typeof GraphqlModule {
  * `require` rather than `import(require.resolve(...))`: graphql@16 declares no `exports`
  * map and its `index.js` is CJS that assigns every export through
  * `Object.defineProperty(exports, name, { get })`. Named-export detection for a CJS file
- * loaded through `import()` goes via cjs-module-lexer, so the shape buildql gets back would
+ * loaded through `import()` goes via cjs-module-lexer, so the shape buildgql gets back would
  * depend on that lexer keeping up with graphql's codegen. `require` hands back
  * `module.exports` itself and cannot mis-detect anything.
  */
@@ -160,11 +160,11 @@ async function importGraphql(cwd: string | undefined): Promise<typeof GraphqlMod
   try {
     return await import('graphql');
   } catch {
-    // Unresolvable from buildql. Under npx that is the normal case, not yet an error.
+    // Unresolvable from buildgql. Under npx that is the normal case, not yet an error.
   }
   if (cwd === undefined) return undefined;
   try {
-    const gql: unknown = createRequire(join(cwd, 'buildql-graphql-resolution.cjs'))('graphql');
+    const gql: unknown = createRequire(join(cwd, 'buildgql-graphql-resolution.cjs'))('graphql');
     return isGraphqlModule(gql) ? gql : undefined;
   } catch {
     return undefined;
@@ -175,18 +175,18 @@ async function introspectSdl(source: string, opts: LoadOptions): Promise<Introsp
   const gql = await importGraphql(opts.cwd);
   if (!gql) {
     throw new Error(
-      `buildql: reading "${source}" as SDL needs the optional peer dependency "graphql", ` +
-        `which could not be resolved from buildql${opts.cwd === undefined ? '' : ` or from ${opts.cwd}`}. ` +
+      `buildgql: reading "${source}" as SDL needs the optional peer dependency "graphql", ` +
+        `which could not be resolved from buildgql${opts.cwd === undefined ? '' : ` or from ${opts.cwd}`}. ` +
         'Install it (`npm install --save-dev graphql`), or point `schema` at an introspection ' +
-        '.json file or a URL instead. Running buildql through `npx`/`dlx` resolves "graphql" ' +
-        'from your project directory, so install it there rather than alongside buildql.',
+        '.json file or a URL instead. Running buildgql through `npx`/`dlx` resolves "graphql" ' +
+        'from your project directory, so install it there rather than alongside buildgql.',
     );
   }
   const sdl = await readFile(source, 'utf8');
   const schema = gql.buildSchema(sdl, { assumeValidSDL: true });
   const result = gql.executeSync({ schema, document: gql.parse(INTROSPECTION_QUERY) }).data;
   if (!isIntrospectionResult(result)) {
-    throw new Error(`buildql: introspection of "${source}" returned no __schema`);
+    throw new Error(`buildgql: introspection of "${source}" returned no __schema`);
   }
   return result;
 }
@@ -196,7 +196,7 @@ async function introspectJson(source: string): Promise<IntrospectionResult> {
     IntrospectionResult | { data: IntrospectionResult };
   const schema = '__schema' in raw ? raw : raw.data;
   if (!schema?.__schema) {
-    throw new Error(`buildql: "${source}" does not contain an introspection result (no __schema key)`);
+    throw new Error(`buildgql: "${source}" does not contain an introspection result (no __schema key)`);
   }
   return schema;
 }

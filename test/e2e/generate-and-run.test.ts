@@ -17,28 +17,28 @@ let genDir: string;
 let genFile: string;
 let usageFile: string;
 
-// The generated `index.ts` imports from the package name `buildql`, which is not
+// The generated `index.ts` imports from the package name `buildgql`, which is not
 // resolvable from a throwaway temp directory. Point it at this project's own
 // `src/index.ts` instead, so both `tsc` and Vitest's runtime `import()` can find it.
 const srcIndexPath = new URL('../../src/index.ts', import.meta.url).pathname;
 
 beforeAll(async () => {
   server = await startServer();
-  genDir = await mkdtemp(join(tmpdir(), 'buildql-e2e-'));
+  genDir = await mkdtemp(join(tmpdir(), 'buildgql-e2e-'));
   genFile = await generate({ schema: server.url, output: '.' }, genDir);
 
-  // Only the runtime import (the first `from 'buildql'`) needs patching: the
-  // trailing `export type { Operation } from 'buildql'` is a type-only re-export
+  // Only the runtime import (the first `from 'buildgql'`) needs patching: the
+  // trailing `export type { Operation } from 'buildgql'` is a type-only re-export
   // that is fully erased at runtime, so it never needs to resolve for the dynamic
   // `import()` in the second test below. It still needs to resolve for `tsc`,
   // though — that is what the `paths` mapping in the temp tsconfig is for.
-  const patched = (await readFile(genFile, 'utf8')).replace("from 'buildql'", `from '${srcIndexPath}'`);
+  const patched = (await readFile(genFile, 'utf8')).replace("from 'buildgql'", `from '${srcIndexPath}'`);
   await writeFile(genFile, patched);
 
   usageFile = join(genDir, 'usage.ts');
   await writeFile(
     usageFile,
-    `import type { RESULT } from 'buildql';
+    `import type { RESULT } from 'buildgql';
 import { query, mutation, on, Dog, Cat } from './index.js';
 
 export const q = query('Posts', ($, Q) => [
@@ -84,7 +84,7 @@ export const s = query('PostsByStatus', ($, Q) => [
         moduleResolution: 'bundler',
         skipLibCheck: true,
         allowImportingTsExtensions: true,
-        paths: { buildql: [srcIndexPath] },
+        paths: { buildgql: [srcIndexPath] },
       },
       include: ['index.ts', 'usage.ts'],
     }),
@@ -152,19 +152,19 @@ it('executes generated operations against the real server, including an unquoted
 }, 60_000);
 
 it('generates a urql-bound module that type-checks under strict mode and runs', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'buildql-e2e-urql-'));
+  const dir = await mkdtemp(join(tmpdir(), 'buildgql-e2e-urql-'));
   const file = await generate({ schema: server.url, output: '.', client: 'urql' }, dir);
 
-  // Neither `buildql` nor `buildql/adapters/urql` resolves from a throwaway temp
+  // Neither `buildgql` nor `buildgql/adapters/urql` resolves from a throwaway temp
   // directory, so both runtime imports are rewritten to this project's own sources. The
   // two quoted specifiers are distinct strings, so a single `.replace` each is enough and
   // the order between them does not matter. As in the default-client case above, the
-  // trailing type-only `export type { Operation } from 'buildql'` is erased at runtime and
+  // trailing type-only `export type { Operation } from 'buildgql'` is erased at runtime and
   // is resolved for `tsc` by the `paths` mapping below instead.
   const adapterPath = new URL('../../src/adapters/urql.ts', import.meta.url).pathname;
   const patched = (await readFile(file, 'utf8'))
-    .replace("from 'buildql/adapters/urql'", `from '${adapterPath}'`)
-    .replace("from 'buildql'", `from '${srcIndexPath}'`);
+    .replace("from 'buildgql/adapters/urql'", `from '${adapterPath}'`)
+    .replace("from 'buildgql'", `from '${srcIndexPath}'`);
   await writeFile(file, patched);
 
   const urqlUsageFile = join(dir, 'usage.ts');
@@ -206,7 +206,7 @@ toUrqlArgs(byStatus, { status: 'ARCHIVED' });
         moduleResolution: 'bundler',
         skipLibCheck: true,
         allowImportingTsExtensions: true,
-        paths: { buildql: [srcIndexPath] },
+        paths: { buildgql: [srcIndexPath] },
       },
       include: ['index.ts', 'usage.ts'],
     }),
@@ -236,14 +236,14 @@ toUrqlArgs(byStatus, { status: 'ARCHIVED' });
   expect(mod.withVars.variables).toEqual({ status: 'PUBLISHED' });
   expect(mod.withVars.query.definitions).toHaveLength(1);
 
-  // The generated module binds urql and NOT buildql's own client.
+  // The generated module binds urql and NOT buildgql's own client.
   const generated = (await import(pathToFileURL(file).href)) as Record<string, unknown>;
   expect(typeof generated.toUrqlArgs).toBe('function');
   expect(typeof generated.urqlDocument).toBe('function');
   expect(generated.createClient).toBeUndefined();
 
   // The document the adapter handed to urql is still the one the server accepts —
-  // executing it through buildql's client proves the adapter changed nothing but the form.
+  // executing it through buildgql's client proves the adapter changed nothing but the form.
   const client = createClient({ url: server.url });
   expect(await client.execute(mod.byStatus, { status: 'PUBLISHED' })).toEqual({
     postsByStatus: [{ id: 'p1', title: 'Hello', status: 'PUBLISHED' }],
@@ -251,7 +251,7 @@ toUrqlArgs(byStatus, { status: 'ARCHIVED' });
 }, 60_000);
 
 it('maps complex scalars through the import, declare and split input/output forms', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'buildql-e2e-scalars-'));
+  const dir = await mkdtemp(join(tmpdir(), 'buildgql-e2e-scalars-'));
 
   // Lives at the temp-dir root while the module is generated into `gql/`, so a `from` of
   // './types' — written against the config — must come out of the emitter as '../types'.
@@ -290,12 +290,12 @@ it('maps complex scalars through the import, declare and split input/output form
   expect(src).toContain("updatedAt: leafField<'updatedAt', ['!'], string>('updatedAt', ['!'])");
   expect(src).toContain('since?: (string | number) | null');
 
-  await writeFile(file, src.replace("from 'buildql'", `from '${srcIndexPath}'`));
+  await writeFile(file, src.replace("from 'buildgql'", `from '${srcIndexPath}'`));
 
   const usage = join(dir, 'gql', 'usage.ts');
   await writeFile(
     usage,
-    `import type { RESULT, VARS } from 'buildql';
+    `import type { RESULT, VARS } from 'buildgql';
 import { query } from './index.js';
 import type { Metadata } from './index.js';
 import type { Money } from '../types';
@@ -335,7 +335,7 @@ export const asNumber: MetaVars = { id: 'p1', since: 0 };
         moduleResolution: 'bundler',
         skipLibCheck: true,
         allowImportingTsExtensions: true,
-        paths: { buildql: [srcIndexPath] },
+        paths: { buildgql: [srcIndexPath] },
       },
       include: ['types.ts', 'gql/index.ts', 'gql/usage.ts'],
     }),

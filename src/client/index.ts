@@ -1,6 +1,6 @@
 export { createClient } from './create-client.js';
 export type { Client, ClientOptions, ExecuteOptions } from './create-client.js';
-export { BuildQLError, BuildQLHttpError, BuildQLResponseError } from './errors.js';
+export { BuildGQLError, BuildGQLHttpError, BuildGQLResponseError } from './errors.js';
 export type { GraphQLFormattedError } from './errors.js';
 export type { HeadersSource } from './headers.js';
 export { sseTransport } from './sse-transport.js';

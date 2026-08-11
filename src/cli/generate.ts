@@ -8,7 +8,7 @@ import { toOutputRelativeSpecifier } from '../codegen/scalar-imports.js';
 import { resolveScalars } from '../codegen/scalars.js';
 import { unmappedScalars } from '../codegen/ts-types.js';
 import { resolveOutputDir } from './config.js';
-import type { BuildQLConfig } from './config.js';
+import type { BuildGQLConfig } from './config.js';
 import { consoleReporter } from './reporter.js';
 import type { Reporter } from './reporter.js';
 
@@ -20,7 +20,7 @@ function resolveSchemaSource(schema: string, cwd: string): string {
 
 /** Runs the full pipeline and returns the path of the file written. */
 export async function generate(
-  config: BuildQLConfig,
+  config: BuildGQLConfig,
   cwd: string,
   reporter: Reporter = consoleReporter,
 ): Promise<string> {
@@ -42,24 +42,24 @@ export async function generate(
   const unmapped = unmappedScalars(ir);
   if (unmapped.length > 0) {
     reporter.warn(
-      `buildql: unmapped custom scalar${unmapped.length > 1 ? 's' : ''}: ${unmapped.join(', ')} — ` +
-        `generated as \`unknown\`. Add ${unmapped.length > 1 ? 'them' : 'it'} to "scalars" in your buildql.config.* for real types.`,
+      `buildgql: unmapped custom scalar${unmapped.length > 1 ? 's' : ''}: ${unmapped.join(', ')} — ` +
+        `generated as \`unknown\`. Add ${unmapped.length > 1 ? 'them' : 'it'} to "scalars" in your buildgql.config.* for real types.`,
     );
   }
 
   if (scalars.prelude.imports.length > 0) {
     const modules = [...new Set(scalars.prelude.imports.map((i) => i.from))].sort();
     reporter.info(
-      `buildql: the generated module imports scalar types from ${modules.join(', ')} ` +
+      `buildgql: the generated module imports scalar types from ${modules.join(', ')} ` +
         `(relative specifiers are resolved against your config file, then rewritten against "output")`,
     );
   }
 
-  const client = config.client ?? 'buildql';
+  const client = config.client ?? 'buildgql';
   const { module, names } = CLIENT_EMITS[client];
-  if (module && module !== 'buildql') {
+  if (module && module !== 'buildgql') {
     reporter.info(
-      `buildql: client "${client}" — the generated module re-exports ${names.join(', ')} ` +
+      `buildgql: client "${client}" — the generated module re-exports ${names.join(', ')} ` +
         `from ${module} (requires the "graphql" package)`,
     );
   }

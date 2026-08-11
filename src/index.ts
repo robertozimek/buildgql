@@ -1,7 +1,7 @@
 export {
-  BuildQLError,
-  BuildQLHttpError,
-  BuildQLResponseError,
+  BuildGQLError,
+  BuildGQLHttpError,
+  BuildGQLResponseError,
   createClient,
   sseTransport,
   wsTransport,

@@ -38,7 +38,7 @@ describe('loadSchema', () => {
     const { mkdtemp, writeFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-'));
     const file = join(dir, 'schema.json');
     await writeFile(file, JSON.stringify({ data: sdlSchema }));
     const schema = await loadSchema(file);
@@ -75,7 +75,7 @@ describe('loadSchema', () => {
     const { mkdtemp, writeFile } = await import('node:fs/promises');
     const { tmpdir } = await import('node:os');
     const { join } = await import('node:path');
-    const dir = await mkdtemp(join(tmpdir(), 'buildql-'));
+    const dir = await mkdtemp(join(tmpdir(), 'buildgql-'));
     const file = join(dir, 'schema.json');
     await writeFile(file, JSON.stringify({ notAnIntrospectionResult: true }));
     await expect(loadSchema(file)).rejects.toThrow(/no __schema key/);

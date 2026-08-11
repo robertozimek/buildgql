@@ -12,24 +12,24 @@ A file that grows past ~200 lines or acquires a second reason to change gets spl
 
 **Function prefixes** carry meaning:
 
-| Prefix     | Meaning                           | Example                             |
-| ---------- | --------------------------------- | ----------------------------------- |
-| `make*`    | returns a builder function        | `makeQuery`, `makeFragment`         |
-| `to*`      | pure conversion                   | `toDocument`, `toApolloQuery`       |
-| `is*`      | type-guard predicate              | `isVarMarker`, `isClientKind`       |
-| `assert*`  | throws, or narrows its argument   | `assertKind`, `assertBuildQLConfig` |
-| `collect*` | walks a tree accumulating results | `collectFragments`                  |
-| `print*`   | renders to GraphQL source text    | `printOperation`, `printValue`      |
-| `emit*`    | renders to TypeScript source text | `emitField`, `emitTypeMap`          |
+| Prefix     | Meaning                           | Example                              |
+| ---------- | --------------------------------- | ------------------------------------ |
+| `make*`    | returns a builder function        | `makeQuery`, `makeFragment`          |
+| `to*`      | pure conversion                   | `toDocument`, `toApolloQuery`        |
+| `is*`      | type-guard predicate              | `isVarMarker`, `isClientKind`        |
+| `assert*`  | throws, or narrows its argument   | `assertKind`, `assertBuildGQLConfig` |
+| `collect*` | walks a tree accumulating results | `collectFragments`                   |
+| `print*`   | renders to GraphQL source text    | `printOperation`, `printValue`       |
+| `emit*`    | renders to TypeScript source text | `emitField`, `emitTypeMap`           |
 
 **Types** are PascalCase and spell out the concept. Avoid abbreviations that only make
 sense from inside the file — `FieldSelection`, not `Sel`.
 
-**Errors.** Every thrown message starts with `buildql: `. Most call sites throw a plain
-`Error` with that prefix; the client's typed errors (`BuildQLHttpError`,
-`BuildQLResponseError`) extend the exported `BuildQLError` base so consumers can catch
-them with one `instanceof`. Adding a new error _class_ means extending `BuildQLError`;
-a one-off `throw new Error('buildql: ...')` elsewhere in `src/` is fine as is.
+**Errors.** Every thrown message starts with `buildgql: `. Most call sites throw a plain
+`Error` with that prefix; the client's typed errors (`BuildGQLHttpError`,
+`BuildGQLResponseError`) extend the exported `BuildGQLError` base so consumers can catch
+them with one `instanceof`. Adding a new error _class_ means extending `BuildGQLError`;
+a one-off `throw new Error('buildgql: ...')` elsewhere in `src/` is fine as is.
 
 **Casts.** `any` is banned. `unknown` plus a documented cast is the house style — every
 `as unknown as` must say what type parameter it is attaching and why the value cannot
@@ -82,8 +82,8 @@ So the very first version is published by hand, and every version after it by th
 1. `npm login`, then `npm publish` from a clean checkout of the tagged commit. This prompts
    for a 2FA one-time password; no token is created at any point. (This one release has no
    provenance attestation — nothing published from a laptop can have one.)
-2. On npmjs.com: **buildql → Settings → Trusted publisher →** GitHub Actions, repository
-   `robertozimek/buildql`, workflow filename `release.yml`. The filename must match exactly;
+2. On npmjs.com: **buildgql → Settings → Trusted publisher →** GitHub Actions, repository
+   `robertozimek/buildgql`, workflow filename `release.yml`. The filename must match exactly;
    renaming the workflow breaks publishing until this is updated.
 3. Same page, **Publishing access → Require two-factor authentication or trusted publishing**.
    That is what actually forbids a token from publishing, rather than merely not having one.
@@ -103,5 +103,5 @@ so the tarball never depends on whatever happened to be in a working tree — `d
 gitignored and `files` ships nothing else.
 
 Verify a release candidate locally with `npm pack` and run the tarball the way a user
-would (`npx ./buildql-<version>.tgz generate` in a scratch project); `test/built/**` covers
+would (`npx ./buildgql-<version>.tgz generate` in a scratch project); `test/built/**` covers
 the same ground automatically on every run of `npm run check`.

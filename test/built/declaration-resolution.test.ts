@@ -59,11 +59,11 @@ const graphqlDir = fileURLToPath(new URL('node_modules/graphql', repoRoot));
 
 /** Every subpath `exports` publishes, imported by both fixtures. */
 const SUBPATHS = [
-  'buildql',
-  'buildql/client',
-  'buildql/config',
-  'buildql/adapters/apollo',
-  'buildql/adapters/urql',
+  'buildgql',
+  'buildgql/client',
+  'buildgql/config',
+  'buildgql/adapters/apollo',
+  'buildgql/adapters/urql',
 ];
 
 /**
@@ -91,17 +91,17 @@ beforeAll(() => {
   ].filter((rel) => !existsSync(`${distDir}${rel}`));
   if (missing.length > 0) {
     throw new Error(
-      `buildql: dist/ is missing ${missing.join(', ')} — this suite asserts on built output. ` +
+      `buildgql: dist/ is missing ${missing.join(', ')} — this suite asserts on built output. ` +
         'Run `npm run build` first (`npm run check` does it for you).',
     );
   }
   if (!existsSync(graphqlDir)) {
-    throw new Error('buildql: node_modules/graphql is missing — the adapter declarations import it.');
+    throw new Error('buildgql: node_modules/graphql is missing — the adapter declarations import it.');
   }
 });
 
 /**
- * A throwaway consumer project with a real `node_modules/buildql` in it.
+ * A throwaway consumer project with a real `node_modules/buildgql` in it.
  *
  * `dist/` and `package.json` are COPIED, not symlinked: the point of the exercise is that
  * resolution goes through the published `exports` map from a plain directory, exactly as
@@ -110,9 +110,9 @@ beforeAll(() => {
  * hoist and link it in real installs anyway.
  */
 function withConsumer(run: (dir: string) => void): void {
-  const dir = mkdtempSync(join(tmpdir(), 'buildql-dts-'));
+  const dir = mkdtempSync(join(tmpdir(), 'buildgql-dts-'));
   try {
-    const installed = join(dir, 'node_modules', 'buildql');
+    const installed = join(dir, 'node_modules', 'buildgql');
     mkdirSync(installed, { recursive: true });
     cpSync(distDir, join(installed, 'dist'), { recursive: true });
     copyFileSync(packageJsonPath, join(installed, 'package.json'));

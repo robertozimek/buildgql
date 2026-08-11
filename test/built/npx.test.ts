@@ -18,11 +18,11 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 const execFileAsync = promisify(execFile);
 
 /**
- * `npx buildql` / `pnpm dlx buildql` — the way most people run this CLI the first time.
+ * `npx buildgql` / `pnpm dlx buildgql` — the way most people run this CLI the first time.
  *
  * What makes that case different from every other suite here is MODULE RESOLUTION, and
  * nothing else. Under npx the binary is unpacked into a throwaway cache directory
- * (`~/.npm/_npx/<hash>/node_modules/buildql/`) that has no relationship to the user's
+ * (`~/.npm/_npx/<hash>/node_modules/buildgql/`) that has no relationship to the user's
  * project, and Node resolves a bare specifier by walking up from the importing FILE. So
  * `import('graphql')` inside the CLI searches the npx cache — where npm has installed no
  * optional peer — and never sees the `graphql` sitting in the project two directories
@@ -64,19 +64,19 @@ beforeAll(() => {
   // Same rule as test/built/interop.test.ts, which explains it at length.
   if (!existsSync(builtBin)) {
     throw new Error(
-      'buildql: dist/cli/bin.js is missing — this suite runs the BUILT binary. ' +
+      'buildgql: dist/cli/bin.js is missing — this suite runs the BUILT binary. ' +
         'Run `npm run build` first (`npm run check` does it for you).',
     );
   }
   if (!existsSync(repoGraphql)) {
     throw new Error(
-      `buildql: ${repoGraphql} is missing — run \`npm ci\`; this suite links it into a fixture.`,
+      `buildgql: ${repoGraphql} is missing — run \`npm ci\`; this suite links it into a fixture.`,
     );
   }
 });
 
 /**
- * The binary, unpacked the way npx unpacks it: `<cache>/node_modules/buildql/dist/cli/bin.js`.
+ * The binary, unpacked the way npx unpacks it: `<cache>/node_modules/buildgql/dist/cli/bin.js`.
  *
  * The nesting is not decoration. `package.json` is copied alongside it because `bin.js` is
  * ESM and a stray `.js` in a directory with no `"type": "module"` is parsed as CommonJS —
@@ -86,8 +86,8 @@ beforeAll(() => {
  * rather than only from `src/`.
  */
 function unpackedCli(): string {
-  const cache = mkTemp('buildql-npx-cache-');
-  const pkgDir = join(cache, 'node_modules', 'buildql');
+  const cache = mkTemp('buildgql-npx-cache-');
+  const pkgDir = join(cache, 'node_modules', 'buildgql');
   mkdirSync(join(pkgDir, 'dist', 'cli'), { recursive: true });
   copyFileSync(builtBin, join(pkgDir, 'dist', 'cli', 'bin.js'));
   copyFileSync(fileURLToPath(new URL('package.json', repoRoot)), join(pkgDir, 'package.json'));
@@ -96,9 +96,9 @@ function unpackedCli(): string {
 
 /** A project to generate into: a config, an SDL schema, and optionally its own `graphql`. */
 function project(opts: { graphql: boolean }): string {
-  const dir = mkTemp('buildql-npx-project-');
+  const dir = mkTemp('buildgql-npx-project-');
   copyFileSync(sdlFixture, join(dir, 'schema.graphql'));
-  writeFileSync(join(dir, 'buildql.config.mjs'), CONFIG);
+  writeFileSync(join(dir, 'buildgql.config.mjs'), CONFIG);
   if (opts.graphql) {
     mkdirSync(join(dir, 'node_modules'), { recursive: true });
     // Symlinked rather than copied: `graphql` is ~1000 files, and Node resolves the link
@@ -115,27 +115,27 @@ describe('the CLI run from outside its own install tree (npx / pnpm dlx)', () =>
 
     const { stdout } = await execFileAsync(process.execPath, [bin, 'generate'], { cwd: dir });
 
-    expect(stdout).toContain('buildql: wrote');
+    expect(stdout).toContain('buildgql: wrote');
     const generated = readFileSync(join(dir, 'gql', 'index.ts'), 'utf8');
     expect(generated).toContain('export const Post = {');
   });
 
   it('still resolves the project graphql when --config points elsewhere', async () => {
-    // `--config <dir>` sets the directory buildql treats as the project, and that is the
+    // `--config <dir>` sets the directory buildgql treats as the project, and that is the
     // directory the `graphql` lookup must use. Resolving from `process.cwd()` instead would
     // pass the test above (the two are the same there) and break for anyone running
-    // `npx buildql generate --config packages/api` from a monorepo root — the exact case
+    // `npx buildgql generate --config packages/api` from a monorepo root — the exact case
     // the flag exists for. Spawned from a directory with no `graphql` above it so that a
     // cwd-based implementation cannot accidentally succeed.
     const bin = unpackedCli();
     const dir = project({ graphql: true });
-    const elsewhere = mkTemp('buildql-npx-elsewhere-');
+    const elsewhere = mkTemp('buildgql-npx-elsewhere-');
 
     const { stdout } = await execFileAsync(process.execPath, [bin, 'generate', '--config', dir], {
       cwd: elsewhere,
     });
 
-    expect(stdout).toContain('buildql: wrote');
+    expect(stdout).toContain('buildgql: wrote');
     expect(existsSync(join(dir, 'gql', 'index.ts'))).toBe(true);
   });
 
@@ -156,7 +156,7 @@ describe('the CLI run from outside its own install tree (npx / pnpm dlx)', () =>
     // reason and prove nothing about the npx path.
     if (!failure) {
       throw new Error(
-        'buildql: the CLI generated without graphql — the npx isolation in this suite is broken',
+        'buildgql: the CLI generated without graphql — the npx isolation in this suite is broken',
       );
     }
     expect(failure.code).toBe(1);

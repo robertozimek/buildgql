@@ -1,6 +1,6 @@
 import type { Operation } from '../runtime/operation.js';
 import type { HasVars } from '../types/vars.js';
-import { BuildQLHttpError, BuildQLResponseError } from './errors.js';
+import { BuildGQLHttpError, BuildGQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 import { mergeHeaders, resolveHeaders } from './headers.js';
 import type { HeadersSource } from './headers.js';
@@ -37,7 +37,7 @@ export interface Client {
 export function createClient(options: ClientOptions): Client {
   const doFetch = options.fetch ?? globalThis.fetch;
   if (typeof doFetch !== 'function') {
-    throw new Error('buildql: no fetch implementation available — pass one via createClient({ fetch })');
+    throw new Error('buildgql: no fetch implementation available — pass one via createClient({ fetch })');
   }
 
   return {
@@ -60,7 +60,7 @@ export function createClient(options: ClientOptions): Client {
         }),
       });
 
-      if (!res.ok) throw new BuildQLHttpError(res.status, await res.text().catch(() => ''));
+      if (!res.ok) throw new BuildGQLHttpError(res.status, await res.text().catch(() => ''));
 
       // Read the body ONCE as text and parse it by hand. Calling `res.json()` and
       // then falling back to `res.text()` in the catch cannot work: the stream is
@@ -71,11 +71,11 @@ export function createClient(options: ClientOptions): Client {
       try {
         payload = JSON.parse(raw) as RawResponse;
       } catch {
-        throw new BuildQLHttpError(res.status, raw);
+        throw new BuildGQLHttpError(res.status, raw);
       }
 
       if (payload.errors && payload.errors.length > 0) {
-        throw new BuildQLResponseError(payload.errors, payload.data);
+        throw new BuildGQLResponseError(payload.errors, payload.data);
       }
       return payload.data as R;
     },
@@ -83,7 +83,7 @@ export function createClient(options: ClientOptions): Client {
     subscribe<R, V>(op: Operation<R, V>, ...rest: VarArgs<V>): AsyncIterable<R> {
       const transport = options.subscriptions;
       if (!transport) {
-        throw new Error('buildql: createClient({ subscriptions }) is required to run subscriptions');
+        throw new Error('buildgql: createClient({ subscriptions }) is required to run subscriptions');
       }
       const [vars, opts] = rest as [V | undefined, ExecuteOptions | undefined];
       const controller = new AbortController();
@@ -109,7 +109,7 @@ export function createClient(options: ClientOptions): Client {
           const headers = mergeHeaders(base, opts?.headers);
           for await (const chunk of transport.subscribe(payload, controller.signal, headers)) {
             if (chunk.errors && chunk.errors.length > 0) {
-              throw new BuildQLResponseError(chunk.errors, chunk.data);
+              throw new BuildGQLResponseError(chunk.errors, chunk.data);
             }
             yield chunk.data as R;
           }

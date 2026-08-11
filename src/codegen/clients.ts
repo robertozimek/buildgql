@@ -1,7 +1,7 @@
 /** Which GraphQL client the generated module binds to. */
-export type ClientKind = 'buildql' | 'apollo' | 'urql' | 'none';
+export type ClientKind = 'buildgql' | 'apollo' | 'urql' | 'none';
 
-export const CLIENT_KINDS = ['buildql', 'apollo', 'urql', 'none'] as const satisfies readonly ClientKind[];
+export const CLIENT_KINDS = ['buildgql', 'apollo', 'urql', 'none'] as const satisfies readonly ClientKind[];
 
 export interface ClientEmit {
   /** Module the generated file imports the client bindings from. Absent for `'none'`. */
@@ -16,12 +16,12 @@ export interface ClientEmit {
  * here plus an adapter module.
  */
 export const CLIENT_EMITS: Record<ClientKind, ClientEmit> = {
-  buildql: { module: 'buildql', names: ['createClient'] },
+  buildgql: { module: 'buildgql', names: ['createClient'] },
   apollo: {
-    module: 'buildql/adapters/apollo',
+    module: 'buildgql/adapters/apollo',
     names: ['apolloDocument', 'toApolloMutation', 'toApolloQuery'],
   },
-  urql: { module: 'buildql/adapters/urql', names: ['toUrqlArgs', 'urqlDocument'] },
+  urql: { module: 'buildgql/adapters/urql', names: ['toUrqlArgs', 'urqlDocument'] },
   none: { names: [] },
 };
 

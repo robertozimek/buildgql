@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { leafField, objectField } from '../../src/runtime/builders.js';
 import { makeQuery } from '../../src/runtime/operation.js';
 import { createClient } from '../../src/client/index.js';
-import { BuildQLError, BuildQLHttpError, BuildQLResponseError } from '../../src/client/errors.js';
+import { BuildGQLError, BuildGQLHttpError, BuildGQLResponseError } from '../../src/client/errors.js';
 
 const User = { id: leafField<'id', ['!'], string>('id', ['!']) };
 const query = makeQuery({ users: objectField('users', ['!', 'l', '!'], User) });
@@ -40,22 +40,22 @@ describe('createClient', () => {
     expect(new Headers(init.headers).get('authorization')).toBe('Bearer t');
   });
 
-  it('throws BuildQLResponseError when the payload carries errors', async () => {
+  it('throws BuildGQLResponseError when the payload carries errors', async () => {
     const fetchMock = vi.fn(async () =>
       jsonResponse({ data: null, errors: [{ message: 'boom', path: ['users'] }] }),
     );
     const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as typeof fetch });
-    await expect(client.execute(q)).rejects.toBeInstanceOf(BuildQLResponseError);
+    await expect(client.execute(q)).rejects.toBeInstanceOf(BuildGQLResponseError);
     await expect(client.execute(q)).rejects.toThrow('boom');
   });
 
-  it('throws BuildQLHttpError on a non-2xx response', async () => {
+  it('throws BuildGQLHttpError on a non-2xx response', async () => {
     const fetchMock = vi.fn(async () => new Response('nope', { status: 500 }));
     const client = createClient({ url: 'http://x/graphql', fetch: fetchMock as typeof fetch });
-    await expect(client.execute(q)).rejects.toBeInstanceOf(BuildQLHttpError);
+    await expect(client.execute(q)).rejects.toBeInstanceOf(BuildGQLHttpError);
   });
 
-  it('throws BuildQLHttpError with the raw body on an unparseable 200 response', async () => {
+  it('throws BuildGQLHttpError with the raw body on an unparseable 200 response', async () => {
     const malformed = '{not valid json';
     const fetchMock = vi.fn<typeof fetch>(
       async () => new Response(malformed, { status: 200, headers: { 'content-type': 'application/json' } }),
@@ -63,8 +63,8 @@ describe('createClient', () => {
     const client = createClient({ url: 'http://x/graphql', fetch: fetchMock });
 
     const err = await client.execute(q).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(BuildQLHttpError);
-    expect((err as BuildQLHttpError).body).toBe(malformed);
+    expect(err).toBeInstanceOf(BuildGQLHttpError);
+    expect((err as BuildGQLHttpError).body).toBe(malformed);
   });
 
   it('merges per-request headers with client-level headers, per-request winning on conflict', async () => {
@@ -112,10 +112,10 @@ describe('createClient', () => {
     expect(seenSignal?.aborted).toBe(false);
   });
 
-  it('lets one instanceof check catch every buildql error', () => {
-    expect(new BuildQLHttpError(500, 'boom')).toBeInstanceOf(BuildQLError);
-    expect(new BuildQLResponseError([{ message: 'nope' }], undefined)).toBeInstanceOf(BuildQLError);
-    expect(new BuildQLHttpError(500, 'boom').name).toBe('BuildQLHttpError');
-    expect(new BuildQLResponseError([{ message: 'nope' }], undefined).name).toBe('BuildQLResponseError');
+  it('lets one instanceof check catch every buildgql error', () => {
+    expect(new BuildGQLHttpError(500, 'boom')).toBeInstanceOf(BuildGQLError);
+    expect(new BuildGQLResponseError([{ message: 'nope' }], undefined)).toBeInstanceOf(BuildGQLError);
+    expect(new BuildGQLHttpError(500, 'boom').name).toBe('BuildGQLHttpError');
+    expect(new BuildGQLResponseError([{ message: 'nope' }], undefined).name).toBe('BuildGQLResponseError');
   });
 });

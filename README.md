@@ -1,4 +1,4 @@
-# buildql
+# buildgql
 
 Type-safe GraphQL query builder, generated from your schema's introspection.
 
@@ -41,21 +41,21 @@ re-exported from it, so everyday code only needs that one import.
 ## Install
 
 ```bash
-npm i buildql
+npm i buildgql
 ```
 
 Or run the generator without installing anything:
 
 ```bash
-npx buildql generate          # pnpm dlx buildql generate, yarn dlx buildql generate
+npx buildgql generate          # pnpm dlx buildgql generate, yarn dlx buildgql generate
 ```
 
 One caveat when you run it that way, and only if your `schema` points at an SDL
-file (`.graphql`): parsing SDL needs `graphql`, which buildql declares as an
-_optional_ peer dependency and `npx` does not install. buildql looks for it in
-your project directory (the one holding `buildql.config.*`, or whatever
+file (`.graphql`): parsing SDL needs `graphql`, which buildgql declares as an
+_optional_ peer dependency and `npx` does not install. buildgql looks for it in
+your project directory (the one holding `buildgql.config.*`, or whatever
 `--config` names), so `npm i -D graphql` there is enough — you do not need to
-install buildql itself. A `schema` that is a URL or an `introspection.json` file
+install buildgql itself. A `schema` that is a URL or an `introspection.json` file
 needs nothing extra.
 
 Contributing? See [CONTRIBUTING.md](./CONTRIBUTING.md) for the naming, error, and
@@ -65,11 +65,11 @@ convention enforced by review.
 
 ## Configure
 
-Create `buildql.config.mjs` — this works on **every** supported Node version,
+Create `buildgql.config.mjs` — this works on **every** supported Node version,
 including Node 20 in CI:
 
 ```js
-import { defineConfig } from 'buildql/config';
+import { defineConfig } from 'buildgql/config';
 
 export default defineConfig({
   // a URL...
@@ -82,22 +82,22 @@ export default defineConfig({
   // See "Custom scalars" below for object-typed scalars.
   scalars: { DateTime: 'string', JSON: 'unknown' },
 
-  // 'buildql' (default) | 'apollo' | 'urql' | 'none' — see "Using Apollo or urql"
-  client: 'buildql',
+  // 'buildgql' (default) | 'apollo' | 'urql' | 'none' — see "Using Apollo or urql"
+  client: 'buildgql',
 });
 ```
 
-If you'd rather write `buildql.config.ts` for the editor type-checking on
+If you'd rather write `buildgql.config.ts` for the editor type-checking on
 `defineConfig(...)`, that works too — but only on **Node >= 22.6 run with
 `--experimental-strip-types`, or Node >= 23.6** (where native TypeScript
-support is unflagged). On older Node, buildql falls back to any
-`buildql.config.mjs`/`buildql.config.js` also present; if none is present it
+support is unflagged). On older Node, buildgql falls back to any
+`buildgql.config.mjs`/`buildgql.config.js` also present; if none is present it
 fails with an error telling you to add one or upgrade Node.
 
 Then:
 
 ```bash
-npx buildql generate
+npx buildgql generate
 ```
 
 ## Variables
@@ -130,7 +130,7 @@ variable transport encodes enums correctly regardless of nesting.
 ## Custom scalars
 
 Every scalar outside GraphQL's built-in five (`ID`, `String`, `Int`, `Float`, `Boolean`)
-needs an entry in `scalars`, or it generates as `unknown` (and buildql warns, by name,
+needs an entry in `scalars`, or it generates as `unknown` (and buildgql warns, by name,
 when it does). The simplest entry is a raw TypeScript type expression, used in both
 argument and result position:
 
@@ -154,7 +154,7 @@ scalars: { DateTime: { input: 'string | Date', output: 'string' } }
 scalars: { Money: { name: 'Money', from: './src/types/money' } }
 ```
 
-**A type declared inline.** `declare` is the right-hand side of a type alias; buildql
+**A type declared inline.** `declare` is the right-hand side of a type alias; buildgql
 emits `export type <name> = ...` into the generated module, so your own code can import
 the type from there too:
 
@@ -176,7 +176,7 @@ or declaring the type: `{ name: 'Money', from: './money', input: 'Money | string
 A **package specifier** (`type-fest`, `@myorg/domain-types`) is emitted verbatim.
 
 A **relative or absolute path** is written against _your config file_ — the same as
-`schema` and `output` — and buildql rewrites it to be relative to `output`. With
+`schema` and `output` — and buildgql rewrites it to be relative to `output`. With
 `output: './src/gql'`, a `from` of `'./src/types/money'` is emitted as `'../types/money'`.
 Extensions are preserved exactly as written, so `nodenext` projects can write
 `'./src/types/money.js'`.
@@ -190,11 +190,11 @@ points at source files that will not exist inside the published package, so use 
 - **a package specifier** — `from: '@myorg/domain-types'`. Resolves from inside the
   published package, provided that package is a dependency of it.
 
-buildql prints the modules the generated file imports scalar types from, so you can
+buildgql prints the modules the generated file imports scalar types from, so you can
 eyeball a mis-pointed path at generate time. It does not check that they resolve — that
 still surfaces at your consumers' `tsc`.
 
-### What buildql will refuse
+### What buildgql will refuse
 
 The config is validated before anything is generated: an unknown key (`ouput`), a `name`
 that isn't a bare identifier (ASCII letters/digits/`_`/`$`, not starting with a digit), or
@@ -231,7 +231,7 @@ since directives have no argument key to take the name from.
 ## Subscriptions
 
 ```ts
-import { createClient, sseTransport } from 'buildql/client';
+import { createClient, sseTransport } from 'buildgql/client';
 
 const client = createClient({
   url: 'https://api.example.com/graphql',
@@ -254,7 +254,7 @@ you build queries and mutations with `query`/`mutation`.
 
 ## Using Apollo or urql
 
-buildql's own `createClient` is the default, but the generated operations are just
+buildgql's own `createClient` is the default, but the generated operations are just
 documents plus inferred types — they run through any GraphQL client. Set `client`
 in your config and the generated module re-exports that client's adapter instead
 of `createClient`:
@@ -319,13 +319,13 @@ Variables follow the same rule as `client.execute`: required schema arguments ma
 You can also import the adapters directly without touching your config:
 
 ```ts
-import { toApolloQuery } from 'buildql/adapters/apollo';
-import { toUrqlArgs } from 'buildql/adapters/urql';
+import { toApolloQuery } from 'buildgql/adapters/apollo';
+import { toUrqlArgs } from 'buildgql/adapters/urql';
 ```
 
 Adapters need the `graphql` package installed — they parse the printed document into
 the AST these clients require. If it isn't installed, the import fails with Node's
-`ERR_MODULE_NOT_FOUND` (`Cannot find package 'graphql'`) rather than a `buildql:` message
+`ERR_MODULE_NOT_FOUND` (`Cannot find package 'graphql'`) rather than a `buildgql:` message
 — the adapters import it statically so the adapter functions can stay synchronous. Setting
 `client: 'none'` binds no client at all, if you want to wire one up yourself.
 
@@ -336,11 +336,11 @@ Relay is **not** supported, and no adapter is planned.
 Relay's store does not consume GraphQL documents at runtime. It requires
 `ConcreteRequest` artifacts emitted ahead of time by relay-compiler — a normalization
 AST, hashed identifiers, and a fragment-per-component model that the compiler derives
-from source files it has scanned. buildql builds its documents at runtime from
+from source files it has scanned. buildgql builds its documents at runtime from
 TypeScript selections, so there is nothing for relay-compiler to read and nothing for
 the store to normalize against.
 
-If you use Relay, use its own compiler. buildql and Relay solve the same problem in
+If you use Relay, use its own compiler. buildgql and Relay solve the same problem in
 incompatible ways.
 
 ## Requirements
@@ -349,10 +349,10 @@ incompatible ways.
 - Node **>= 18** to install and run the generated client/CLI in general.
   Loading a **`.ts`** config file specifically needs Node's native TypeScript
   support: **>= 22.6 with `--experimental-strip-types`, or >= 23.6**. Use
-  `buildql.config.mjs` (see **Configure** above) if you're on an older Node —
+  `buildgql.config.mjs` (see **Configure** above) if you're on an older Node —
   it works everywhere Node >= 18 does.
 - `graphql` if you point `schema` at an SDL file, **or** if you use an Apollo/urql
-  adapter (`client: 'apollo' | 'urql'`, or a direct `buildql/adapters/*` import) —
+  adapter (`client: 'apollo' | 'urql'`, or a direct `buildgql/adapters/*` import) —
   the adapters parse the printed document into the AST those clients expect. URL and
   `.json` introspection sources with the default client need no extra dependency.
 
@@ -365,7 +365,7 @@ flag every read widens to `VarMarker | undefined`, which the argument types reje
 Use the explicit form instead — it is unaffected:
 
 ```ts
-import { v } from 'buildql';
+import { v } from 'buildgql';
 
 const UserById = query('UserById', ($, q) => [q.user({ id: v('id') }, (user) => [user.name])]);
 ```

@@ -12,12 +12,12 @@ function applyDirective<N extends string, R, V, Name extends string>(
     directive = { name, if: cond };
   } else {
     if (!isVarMarker(cond)) {
-      throw new Error(`buildql: @${name} condition must be a boolean or a variable from v()`);
+      throw new Error(`buildgql: @${name} condition must be a boolean or a variable from v()`);
     }
     const varName = markerName(cond as VarMarker);
     if (varName === null) {
       throw new Error(
-        `buildql: @${name} needs an explicitly named variable — use v('flagName'), not $.flagName. ` +
+        `buildgql: @${name} needs an explicitly named variable — use v('flagName'), not $.flagName. ` +
           'Directive conditions have no argument key to take their name from.',
       );
     }

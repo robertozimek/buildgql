@@ -1,5 +1,5 @@
 {
-  "name": "buildql",
+  "name": "buildgql",
   "version": "0.1.0",
   "description": "Type-safe GraphQL query builder generated from introspection",
   "license": "MIT",
@@ -12,13 +12,13 @@
     "type-safe"
   ],
   "author": "Robert Ozimek",
-  "homepage": "https://github.com/robertozimek/buildql#readme",
+  "homepage": "https://github.com/robertozimek/buildgql#readme",
   "bugs": {
-    "url": "https://github.com/robertozimek/buildql/issues"
+    "url": "https://github.com/robertozimek/buildgql/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/robertozimek/buildql.git"
+    "url": "git+https://github.com/robertozimek/buildgql.git"
   },
   "publishConfig": {
     "access": "public"
@@ -27,7 +27,7 @@
     "./dist/cli/bin.js"
   ],
   "bin": {
-    "buildql": "./dist/cli/bin.js"
+    "buildgql": "./dist/cli/bin.js"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

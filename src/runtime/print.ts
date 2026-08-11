@@ -28,7 +28,7 @@ function printValue(value: unknown): string {
       .map(([k, v]) => `${k}: ${printValue(v)}`);
     return `{${entries.join(', ')}}`;
   }
-  throw new Error(`buildql: cannot serialise argument value of type ${typeof value}`);
+  throw new Error(`buildgql: cannot serialise argument value of type ${typeof value}`);
 }
 
 function printArgs(argv: Record<string, unknown> | undefined): string {
@@ -99,7 +99,7 @@ function dedupeVarRefs(refs: readonly VarRef[]): VarRef[] {
     const seen = byName.get(ref.varName);
     if (seen && seen.gqlType !== ref.gqlType) {
       throw new Error(
-        `buildql: variable $${ref.varName} is used with two different types ` +
+        `buildgql: variable $${ref.varName} is used with two different types ` +
           `(${seen.gqlType} and ${ref.gqlType}). Give one of them an explicit name with v('otherName').`,
       );
     }

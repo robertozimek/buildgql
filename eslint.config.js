@@ -87,7 +87,7 @@ export default tseslint.config(
     // `graphql` is an OPTIONAL peer dependency. Only `src/adapters/**`, `src/codegen/**`
     // and `src/cli/**` may import it; the package's main entry and everything it reaches
     // must not, or a consumer who did not install `graphql` gets ERR_MODULE_NOT_FOUND on
-    // `import 'buildql'` itself. This repo has `graphql` in its own devDependencies, so
+    // `import 'buildgql'` itself. This repo has `graphql` in its own devDependencies, so
     // nothing about a `src/`-level type-check or unit test would notice.
     //
     // The TYPE-CHECKED variant of the rule, not the base one: `import type { DocumentNode }
@@ -109,7 +109,7 @@ export default tseslint.config(
               group: ['graphql', 'graphql/*'],
               message:
                 'graphql is an optional peer dependency: only src/adapters, src/codegen and src/cli may import it. ' +
-                'Importing it here breaks `import "buildql"` for every consumer who did not install graphql.',
+                'Importing it here breaks `import "buildgql"` for every consumer who did not install graphql.',
             },
           ],
         },

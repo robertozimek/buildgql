@@ -36,7 +36,7 @@ export function isBareSpecifier(spec: string, pathModule: PathModule = defaultPa
 
 /**
  * Re-expresses a file-path specifier, written relative to the *config file*, as one relative
- * to the *generated module*. Relative paths in `buildql.config.*` already resolve against the
+ * to the *generated module*. Relative paths in `buildgql.config.*` already resolve against the
  * config's own directory (`schema`, `output`), so `scalars[...].from` does the same rather
  * than making the user do path arithmetic against `output` by hand — and so that changing
  * `output` later cannot silently break the import.
@@ -59,7 +59,7 @@ export function toOutputRelativeSpecifier(
   // Throw instead, telling the user to use a bare specifier or the `declare` form.
   if (pathModule.isAbsolute(rel)) {
     throw new Error(
-      `buildql: cannot rewrite ${spec} for output: configDir (${configDir}) and outputDir (${outputDir}) ` +
+      `buildgql: cannot rewrite ${spec} for output: configDir (${configDir}) and outputDir (${outputDir}) ` +
         `have no shared base path (on Windows, they may be on different drives). ` +
         `Use a bare package specifier (e.g. '@myorg/types') or the "declare" config key ` +
         `(e.g. { name: 'Money', declare: '...' }) instead.`,

@@ -12,9 +12,9 @@ it('exports exactly the documented public surface', () => {
   // output, by test/built/type-surface.test.ts.
   expect(Object.keys(api).sort()).toEqual(
     [
-      'BuildQLError',
-      'BuildQLHttpError',
-      'BuildQLResponseError',
+      'BuildGQLError',
+      'BuildGQLHttpError',
+      'BuildGQLResponseError',
       'VERSION',
       '$',
       'argSpec',

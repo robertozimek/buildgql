@@ -72,7 +72,7 @@ describe('resolveScalars', () => {
         A: { name: 'Shared', from: 'pkg-a' },
         B: { name: 'Shared', from: 'pkg-b' },
       }),
-    ).toThrow(/buildql: two scalars both map to a TypeScript type named "Shared"/);
+    ).toThrow(/buildgql: two scalars both map to a TypeScript type named "Shared"/);
   });
 
   it('orders the prelude by GraphQL scalar name, so the same config always emits the same bytes', () => {

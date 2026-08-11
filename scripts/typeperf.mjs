@@ -37,10 +37,10 @@ console.log(`instantiations: ${instantiations} (budget ${BUDGET_INSTANTIATIONS})
 console.log(`check time:     ${checkTime}s (budget ${BUDGET_CHECK_SECONDS}s)`);
 
 if (!Number.isFinite(instantiations) || instantiations > BUDGET_INSTANTIATIONS) {
-  console.error('buildql: type instantiation budget exceeded');
+  console.error('buildgql: type instantiation budget exceeded');
   process.exit(1);
 }
 if (!Number.isFinite(checkTime) || checkTime > BUDGET_CHECK_SECONDS) {
-  console.error('buildql: type check time budget exceeded');
+  console.error('buildgql: type check time budget exceeded');
   process.exit(1);
 }

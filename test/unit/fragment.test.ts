@@ -53,7 +53,7 @@ it('throws when two distinct fragments share a name', () => {
   const Same2 = userFragment('Same', (U) => [U.firstName]);
   expect(() =>
     query('Both', ($, Q) => [Q.users((U) => [spread(Same1)]), Q.users.as('again')((U) => [spread(Same2)])]),
-  ).toThrow(/buildql: two different fragments are both named "Same"/);
+  ).toThrow(/buildgql: two different fragments are both named "Same"/);
 });
 
 it('reusing the same fragment handle twice does not throw and emits one definition', () => {

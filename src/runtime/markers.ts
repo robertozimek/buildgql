@@ -3,9 +3,9 @@ import type { VarMarker } from '../types/vars.js';
 // `Symbol.for`, not `Symbol()`: the dual ESM/CJS build can put two copies of this
 // module in one process (see the note on the document cache in
 // src/adapters/document.ts), and markers made by one must be recognised by the other.
-const VAR = Symbol.for('buildql.var');
-const ENUM = Symbol.for('buildql.enum');
-const VAR_REF = Symbol.for('buildql.varRef');
+const VAR = Symbol.for('buildgql.var');
+const ENUM = Symbol.for('buildgql.enum');
+const VAR_REF = Symbol.for('buildgql.varRef');
 
 interface RuntimeVarMarker {
   readonly [VAR]: true;

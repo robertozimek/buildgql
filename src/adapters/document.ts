@@ -9,7 +9,7 @@ export type OperationKind = Operation<unknown, unknown>['kind'];
  * A `DocumentNode` carrying its result and variable types as a phantom property.
  *
  * Declared here rather than imported from `@graphql-typed-document-node/core` so that
- * neither buildql nor its consumers take on that dependency: Apollo Client and urql read
+ * neither buildgql nor its consumers take on that dependency: Apollo Client and urql read
  * `__apiType` structurally, and TypeScript's structural typing makes this interface
  * interchangeable with theirs. `test/types/adapters.test-d.ts` pins that interop against
  * the real package.
@@ -60,7 +60,7 @@ export function assertKind(
 ): void {
   if (!allowed.includes(op.kind)) {
     throw new Error(
-      `buildql: ${helper}() expects a ${allowed.join(' or ')} operation, ` +
+      `buildgql: ${helper}() expects a ${allowed.join(' or ')} operation, ` +
         `but "${op.name}" is a ${op.kind}.`,
     );
   }
