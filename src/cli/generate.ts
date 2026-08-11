@@ -24,7 +24,13 @@ export async function generate(
   cwd: string,
   reporter: Reporter = consoleReporter,
 ): Promise<string> {
-  const schema = await loadSchema(resolveSchemaSource(config.schema, cwd), { headers: config.headers });
+  // `cwd` is forwarded, not just used to resolve the path: an SDL schema needs the optional
+  // `graphql` peer, and under `npx`/`dlx` the only copy that exists is the project's own.
+  // See `importGraphql` in ../codegen/introspect.ts.
+  const schema = await loadSchema(resolveSchemaSource(config.schema, cwd), {
+    headers: config.headers,
+    cwd,
+  });
 
   // `dir` is computed before the IR, not after: a relative `scalars[...].from` is written
   // against the config file and has to be re-expressed against the directory the generated

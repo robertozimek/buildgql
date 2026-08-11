@@ -129,6 +129,22 @@ it('main() --help returns 0 and prints usage', async () => {
   expect(written(stdoutSpy)).toContain('Usage:');
 });
 
+it('main() --version prints the manifest version and nothing else', async () => {
+  // Compared against the manifest rather than a literal, so bumping the version does not
+  // break the test — and so a `version()` that read the WRONG package.json (its own
+  // dependency's, say, if the relative path drifted) fails here instead of shipping a
+  // number that has nothing to do with buildql.
+  const manifest = JSON.parse(
+    await readFile(fileURLToPath(new URL('../../package.json', import.meta.url)), 'utf8'),
+  ) as { version: string };
+
+  const code = await main(['--version']);
+  expect(code).toBe(0);
+  // Exact, not `toContain`: `buildql --version` is the sort of thing a script pipes
+  // somewhere, and usage text or a banner mixed into that output would break it silently.
+  expect(written(stdoutSpy)).toBe(`${manifest.version}\n`);
+});
+
 it('main() with an unknown command returns 1', async () => {
   const code = await main(['bogus']);
   expect(code).toBe(1);

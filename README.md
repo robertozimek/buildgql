@@ -44,6 +44,20 @@ re-exported from it, so everyday code only needs that one import.
 npm i buildql
 ```
 
+Or run the generator without installing anything:
+
+```bash
+npx buildql generate          # pnpm dlx buildql generate, yarn dlx buildql generate
+```
+
+One caveat when you run it that way, and only if your `schema` points at an SDL
+file (`.graphql`): parsing SDL needs `graphql`, which buildql declares as an
+_optional_ peer dependency and `npx` does not install. buildql looks for it in
+your project directory (the one holding `buildql.config.*`, or whatever
+`--config` names), so `npm i -D graphql` there is enough — you do not need to
+install buildql itself. A `schema` that is a URL or an `introspection.json` file
+needs nothing extra.
+
 Contributing? See [CONTRIBUTING.md](./CONTRIBUTING.md) for the naming, error, and
 type-performance conventions this repo follows — `npm run check` enforces what's
 mechanical (case shape, the `any` ban, the type-instantiation budget); the rest is

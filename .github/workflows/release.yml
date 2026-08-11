@@ -1,0 +1,76 @@
+name: Release
+
+# Publishing is driven by a version tag, not by a push to main: the tarball that reaches
+# npm is immutable and a version can never be republished, so the trigger has to be an
+# explicit, deliberate act rather than a side effect of merging.
+on:
+  push:
+    tags: ['v*']
+  # `workflow_dispatch` exists for re-running a release whose publish step failed AFTER the
+  # tag was already pushed (a flaky registry, an expired token). It takes the same path and
+  # the same guards; nothing here reads the tag except the guard below.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to publish, e.g. v0.1.0'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      # `id-token: write` is what mints the OIDC token npm exchanges for a provenance
+      # attestation. Without it `npm publish --provenance` fails outright rather than
+      # quietly publishing an unattested tarball.
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          # Writes the .npmrc that points at the public registry and reads NODE_AUTH_TOKEN.
+          # Without it `npm publish` uses whatever registry the runner defaults to and
+          # ignores the secret entirely.
+          registry-url: https://registry.npmjs.org
+
+      - run: npm ci
+
+      - name: The tag matches the version being published
+        # npm derives the published version from package.json and ignores the tag, so a tag
+        # and a manifest that disagree publish a version nobody asked for under a tag that
+        # points at different code — invisible afterwards, and unfixable, because the
+        # version is burned. Checked before anything is built, so the failure is cheap.
+        shell: bash
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="v$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$version" ]; then
+            echo "::error::tag $tag does not match package.json version $version"
+            exit 1
+          fi
+
+      - name: Lint, format, types, tests, type-perf budget
+        # The same gate CI runs on every PR. Repeated here rather than trusted from the
+        # merge commit: a tag can be pushed to any commit, including one CI never saw.
+        run: npm run check
+
+      - name: The built binary actually runs
+        shell: bash
+        run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
+
+      - name: Publish to npm
+        # `prepack` rebuilds `dist` as part of `npm publish`, so the tarball is always built
+        # from this checkout — `dist` is gitignored and never comes from the repository.
+        #
+        # `--provenance` attaches a signed statement linking the tarball to this workflow
+        # run and this commit, which npm shows on the package page. `--access public` is
+        # redundant with `publishConfig` in package.json and stated anyway: the cost of the
+        # two disagreeing is a private publish that silently fails for every consumer.
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

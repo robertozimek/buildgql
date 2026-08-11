@@ -11,9 +11,17 @@
     "query-builder",
     "type-safe"
   ],
+  "author": "Robert Ozimek",
+  "homepage": "https://github.com/robertozimek/buildql#readme",
+  "bugs": {
+    "url": "https://github.com/robertozimek/buildql/issues"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/robertozimek/buildql.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "sideEffects": [
     "./dist/cli/bin.js"
@@ -98,6 +106,7 @@
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "prepack": "npm run build",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -112,6 +121,9 @@
   },
   "peerDependenciesMeta": {
     "graphql": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     }
   },
