@@ -5,7 +5,8 @@ import { buildIR } from '../../src/codegen/ir.js';
 import { emit } from '../../src/codegen/emit.js';
 import { unmappedScalars } from '../../src/codegen/ts-types.js';
 import type { IRSchema } from '../../src/codegen/ir.js';
-import { DEFAULT_SCALARS } from '../../src/codegen/scalars.js';
+import { DEFAULT_SCALAR_MAPPINGS, EMPTY_SCALAR_PRELUDE, resolveScalars } from '../../src/codegen/scalars.js';
+import type { ScalarConfig } from '../../src/codegen/scalars.js';
 
 const sdlPath = fileURLToPath(new URL('../fixtures/schema.graphql', import.meta.url));
 
@@ -61,7 +62,8 @@ describe('emit', () => {
       queryType: 'Query',
       mutationType: null,
       subscriptionType: null,
-      scalars: DEFAULT_SCALARS,
+      scalars: DEFAULT_SCALAR_MAPPINGS,
+      scalarPrelude: EMPTY_SCALAR_PRELUDE,
       types: [
         {
           name: 'Query',
@@ -135,7 +137,8 @@ describe('emit', () => {
       queryType: 'Query',
       mutationType: null,
       subscriptionType: null,
-      scalars: DEFAULT_SCALARS,
+      scalars: DEFAULT_SCALAR_MAPPINGS,
+      scalarPrelude: EMPTY_SCALAR_PRELUDE,
       types: [
         {
           name: 'Query',
@@ -191,7 +194,8 @@ describe('emit', () => {
       queryType: 'Query',
       mutationType: null,
       subscriptionType: 'Subscription',
-      scalars: DEFAULT_SCALARS,
+      scalars: DEFAULT_SCALAR_MAPPINGS,
+      scalarPrelude: EMPTY_SCALAR_PRELUDE,
       types: [
         {
           name: 'Query',
@@ -335,7 +339,7 @@ describe('emit', () => {
 
   it('falls back to `unknown` for an unmapped scalar named "valueOf", rather than splicing in the inherited Object.prototype member', () => {
     // Regression test for leafTsType/inputTsType: `ir.scalars` here is a plain object
-    // (`DEFAULT_SCALARS` inherits from `Object.prototype`), so a bracket read of
+    // (`DEFAULT_SCALAR_MAPPINGS` inherits from `Object.prototype`), so a bracket read of
     // `ir.scalars['valueOf']` without an own-property guard would resolve to
     // `Object.prototype.valueOf` (a function, not `undefined`) and defeat the `??
     // UNKNOWN_SCALAR` fallback entirely.
@@ -343,7 +347,8 @@ describe('emit', () => {
       queryType: 'Query',
       mutationType: null,
       subscriptionType: null,
-      scalars: DEFAULT_SCALARS,
+      scalars: DEFAULT_SCALAR_MAPPINGS,
+      scalarPrelude: EMPTY_SCALAR_PRELUDE,
       types: [
         {
           name: 'Query',
@@ -379,7 +384,8 @@ describe('emit', () => {
       queryType: 'Query',
       mutationType: null,
       subscriptionType: null,
-      scalars: DEFAULT_SCALARS,
+      scalars: DEFAULT_SCALAR_MAPPINGS,
+      scalarPrelude: EMPTY_SCALAR_PRELUDE,
       types: [
         {
           name: 'Query',
@@ -471,6 +477,77 @@ describe('emit', () => {
     expect(src).not.toMatch(/\bargs</);
     expect(src).not.toMatch(/\bleafArgs\b|\bobjectArgs\b/);
   });
+
+  /** The SDL fixture has no custom scalar, so prelude cases build the IR with overrides. */
+  async function generatedWith(overrides: Record<string, ScalarConfig>) {
+    return emit(buildIR(await loadSchema(sdlPath), resolveScalars(overrides)));
+  }
+
+  it('emits nothing extra when no scalar contributes a prelude', async () => {
+    // Pins the byte-identical-by-default promise: a config that only uses the string form
+    // must produce exactly what buildql produced before the object form existed.
+    expect(await generatedWith({ ID: 'string' })).toBe(await generated());
+    // The assertion above cannot catch an unconditional `parts.push(prelude)`: an empty
+    // prelude would add the same blank line to both sides. This one can — it pins the exact
+    // bytes where the prelude would land if it were ever pushed empty.
+    expect(await generated()).toContain("} from 'buildql';\n\nexport const Query = {");
+  });
+
+  it('emits a type-only import for an imported scalar type', async () => {
+    const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
+    expect(src).toContain("import type { PostId } from '../types/ids';");
+    // Type-only, so the generated module carries no runtime dependency on the user's module —
+    // which is what lets it be published as a package with the types in devDependencies.
+    expect(src).not.toContain('import { PostId }');
+  });
+
+  it('exports a declared scalar type so consumers can name it', async () => {
+    const src = await generatedWith({ ID: { name: 'PostId', declare: 'string & { __brand: "post" }' } });
+    expect(src).toContain('export type PostId = string & { __brand: "post" };');
+  });
+
+  it('groups imports by module and sorts both groups and names', async () => {
+    const src = await generatedWith({
+      ID: { name: 'Zed', from: 'z-pkg' },
+      String: { name: 'Beta', from: 'a-pkg' },
+      Int: { name: 'Alpha', from: 'a-pkg' },
+    });
+    expect(src).toContain("import type { Alpha, Beta } from 'a-pkg';\nimport type { Zed } from 'z-pkg';");
+  });
+
+  it('places the prelude after the runtime import and before the generated types', async () => {
+    const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
+    expect(src.indexOf("from 'buildql'")).toBeLessThan(src.indexOf("from '../types/ids'"));
+    expect(src.indexOf("from '../types/ids'")).toBeLessThan(src.indexOf('export const Post = {'));
+  });
+
+  it('uses the mapped scalar types in both positions in the generated module', async () => {
+    const src = await generatedWith({ ID: { input: 'string | number', output: 'string' } });
+    expect(src).toContain("id: leafField<'id', ['!'], string>('id', ['!'])");
+    // Parenthesised: `inputTsType`'s atomicity guard wraps any non-atomic base
+    // unconditionally (see ts-types.ts and its test), independent of whether a `[]`
+    // ever lands on it — a deliberate, already-pinned decision from Task 4 (ff077dc),
+    // not something this task changes.
+    expect(src).toContain("argSpec<{ id: (string | number) }>({ id: 'ID!' })");
+  });
+
+  it('throws when a scalar type name collides with a generated schema type', async () => {
+    await expect(generatedWith({ ID: { name: 'Post', declare: 'string' } })).rejects.toThrow(
+      /buildql: a "scalars" entry maps to a TypeScript type named "Post"/,
+    );
+  });
+
+  it('throws when a scalar type name collides with a fragment helper', async () => {
+    await expect(generatedWith({ ID: { name: 'postFragment', declare: 'string' } })).rejects.toThrow(
+      /named "postFragment"/,
+    );
+  });
+
+  it('throws when a scalar type name collides with a runtime import', async () => {
+    await expect(generatedWith({ ID: { name: 'leafField', from: 'pkg' } })).rejects.toThrow(
+      /named "leafField"/,
+    );
+  });
 });
 
 describe('unmappedScalars', () => {
@@ -478,7 +555,8 @@ describe('unmappedScalars', () => {
     queryType: 'Query',
     mutationType: null,
     subscriptionType: null,
-    scalars: DEFAULT_SCALARS,
+    scalars: DEFAULT_SCALAR_MAPPINGS,
+    scalarPrelude: EMPTY_SCALAR_PRELUDE,
     types: [
       {
         name: 'Query',
@@ -539,13 +617,17 @@ describe('unmappedScalars', () => {
   it('does not flag scalars covered by the default or configured mapping', () => {
     const mapped: IRSchema = {
       ...schema,
-      scalars: { ...DEFAULT_SCALARS, DateTime: 'string', JSON: 'unknown' },
+      scalars: {
+        ...DEFAULT_SCALAR_MAPPINGS,
+        DateTime: { input: 'string', output: 'string' },
+        JSON: { input: 'unknown', output: 'unknown' },
+      },
     };
     expect(unmappedScalars(mapped)).toEqual([]);
   });
 
   it('flags a scalar named "toString" as unmapped, even though `name in scalars` would resolve it via Object.prototype', () => {
-    // Regression test: `scalars` here is a plain object (as `DEFAULT_SCALARS` is), so
+    // Regression test: `scalars` here is a plain object (as `DEFAULT_SCALAR_MAPPINGS` is), so
     // it inherits `toString`/`valueOf`/`constructor` from `Object.prototype`. A
     // membership check using `in` (rather than `Object.hasOwn`) would treat those
     // names as "mapped" and never flag them.
