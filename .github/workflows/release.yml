@@ -1,15 +1,19 @@
 name: Release
 
-# Publishing is driven by a version tag, not by a push to main: the tarball that reaches
-# npm is immutable and a version can never be republished, so the trigger has to be an
-# explicit, deliberate act rather than a side effect of merging.
+# A release needs two things to be true: a `v*` tag exists, and the commit it points at is
+# on `main`. They can become true in either order, so BOTH events are triggers and each run
+# asks the same question — "is there a releasable tag on main that npm does not have yet?"
+#
+# Tag first, merge later, is the normal flow for a version-bump PR: the tag push finds an
+# unmerged commit and does nothing, and the later push to `main` publishes. Tag a commit
+# already on `main` (what `npm version && git push --follow-tags` does) and the tag push
+# publishes immediately. Neither case is an error, because neither is a mistake.
 on:
   push:
     tags: ['v*']
-  # `workflow_dispatch` exists for re-running a release whose publish step failed AFTER the
-  # tag was already pushed — a flaky registry, or a trusted publisher that was not configured
-  # yet. It takes the same path and the same guards; nothing here reads the tag except the
-  # guards below.
+    branches: [main]
+  # For re-running a release whose publish step failed after the tag was already pushed — a
+  # flaky registry, a trusted publisher that was not configured yet.
   workflow_dispatch:
     inputs:
       tag:
@@ -17,63 +21,123 @@ on:
         required: true
 
 jobs:
-  publish:
+  # Deliberately a SEPARATE job from `publish`, and deliberately outside the `production`
+  # environment. Every push to `main` reaches this workflow, and an environment with required
+  # reviewers turns each of those runs into a pending deployment sitting in someone's queue.
+  # Only a run that has actually decided to publish should enter `production`.
+  gate:
     runs-on: ubuntu-latest
-    # Entering the `production` environment is what subjects this job to that environment's
-    # protection rules — required reviewers, wait timers, and the deployment branch/tag rules
-    # that decide which refs may deploy at all. The rules live in the repository settings,
-    # not here, so this line is the whole of the opt-in: without it the job runs unprotected.
+    permissions:
+      contents: read
+    outputs:
+      publish: ${{ steps.decide.outputs.publish }}
+      version: ${{ steps.decide.outputs.version }}
+      sha: ${{ steps.decide.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+          # Full history and tags: the checks below need a merge-base, and need to resolve a
+          # tag this run was not triggered by. A depth-1 clone has neither.
+          fetch-depth: 0
+
+      - name: Is there a releasable tag on main that npm does not have?
+        id: decide
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').version")"
+          tag="v$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+          # A tag this run was explicitly pointed at, if any: the pushed tag, or the one
+          # `workflow_dispatch` names. A push to `main` has neither, and asks the general
+          # question instead.
+          requested="${{ github.event.inputs.tag }}"
+          if [ -z "$requested" ] && [ "${GITHUB_REF_TYPE:-}" = tag ]; then
+            requested="$GITHUB_REF_NAME"
+          fi
+
+          # Naming a tag that disagrees with the manifest IS an error, and the only hard
+          # failure here. npm derives the published version from package.json and ignores the
+          # tag, so this combination publishes a version nobody asked for under a tag pointing
+          # at different code — unfixable afterwards, because a version is never reusable.
+          if [ -n "$requested" ] && [ "$requested" != "$tag" ]; then
+            echo "::error::tag $requested does not match package.json version $version"
+            exit 1
+          fi
+
+          if ! git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null; then
+            echo "::notice::no $tag tag yet — nothing to release"
+            exit 0
+          fi
+          sha="$(git rev-parse "refs/tags/$tag^{commit}")"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+          # The tagged commit must be REACHABLE FROM main. A tag can be pushed to any commit,
+          # and carries no record of where it was cut, so no ref pattern — not an `if:`, not
+          # an environment branch rule — can express "released from main": on a tag push
+          # `github.ref` is `refs/tags/v0.1.0` and there is no branch to match. Ancestry is
+          # the question that actually has an answer.
+          #
+          # Not reachable is the ordinary "tagged on a branch, not merged yet" case, so it
+          # ends this run quietly. The push to `main` that merges it runs this same check
+          # again and publishes then.
+          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$sha" origin/main; then
+            echo "::notice::$tag ($(git rev-parse --short "$sha")) is not on main yet — it will publish when merged"
+            exit 0
+          fi
+
+          # Publishing is not idempotent: a second attempt at an existing version fails with
+          # EPUBLISHCONFLICT. That is reached routinely here — every later push to `main`
+          # re-examines the same tag — and is a no-op, not a failure. `npm view` exits nonzero
+          # for an unpublished version, which is the answer rather than an error, hence the
+          # test on its output instead of its status.
+          if [ -n "$(npm view "buildgql@$version" version 2>/dev/null || true)" ]; then
+            echo "::notice::buildgql@$version is already published"
+            exit 0
+          fi
+
+          echo "::notice::releasing buildgql@$version from $(git rev-parse --short "$sha")"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: gate
+    if: needs.gate.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    # Entering `production` is what subjects this job to that environment's protection rules —
+    # required reviewers, wait timers, and the deployment ref rules. Those live in the
+    # repository settings, not here; this line is the whole of the opt-in.
     #
-    # The environment's ref rule has to permit TAGS (`v*`), not the `main` branch: this
-    # workflow is triggered by a tag push, so `github.ref` is `refs/tags/v0.1.0` and a
-    # branch-only rule rejects every release. "Only from main" is a different guarantee, and
-    # is enforced by the ancestry check below rather than by the environment.
+    # The environment's ref rule must permit TAGS (`v*`) as well as `main`, since this job
+    # runs under both triggers. It is not where "only from main" is enforced — see `gate`.
     #
-    # `url` is cosmetic — it turns the environment badge in the Actions UI into a link to
-    # what was published.
+    # `url` is cosmetic: it turns the environment badge in the Actions UI into a link to what
+    # was published.
     environment:
       name: production
       url: https://www.npmjs.com/package/buildgql
     permissions:
-      # `id-token: write` is what mints the OIDC token npm exchanges for the short-lived
-      # publish credential — it is the ENTIRE authentication story here, not a hardening
-      # extra, and the same token is what provenance is attested against. Without it there
-      # is nothing to publish with, since the repository holds no npm token.
+      # `id-token: write` mints the OIDC token npm exchanges for the short-lived publish
+      # credential — the ENTIRE authentication story here, not a hardening extra, and what
+      # provenance is attested against. Without it there is nothing to publish with, since
+      # this repository holds no npm token.
       id-token: write
       contents: read
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
-          # Full history, because the ancestry check below needs a merge-base. The default
-          # depth-1 clone has no ancestors to compute one from.
-          fetch-depth: 0
-
-      - name: The tagged commit is on main
-        # A tag can be pushed to ANY commit — a feature branch, a detached experiment, a
-        # commit that only ever existed on someone's laptop — and nothing about the tag
-        # itself records where it came from. `github.ref` is `refs/tags/v0.1.0` on this
-        # trigger, so neither an `if:` on the branch nor a branch-based environment rule can
-        # express "released from main"; both would see a tag and have nothing to compare.
-        #
-        # Reachability is the actual question, and `merge-base --is-ancestor` is what answers
-        # it: the tagged commit must be contained in `main`. That holds for a normal
-        # merge-then-tag, and fails for a tag on unmerged work, which is the mistake worth
-        # catching — the published version is unrepublishable, so code that reached npm
-        # without review cannot be taken back.
-        shell: bash
-        run: |
-          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor HEAD origin/main; then
-            echo "::error::$(git rev-parse --short HEAD) is not an ancestor of main — release only merged commits"
-            exit 1
-          fi
+          # The TAGGED commit, resolved by `gate`, rather than whatever `main` points at now:
+          # a merge landing between the two jobs would otherwise be published under a tag that
+          # does not contain it.
+          ref: ${{ needs.gate.outputs.sha }}
 
       - uses: actions/setup-node@v4
         with:
           # 22, not the 20 that ci.yml checks against, because trusted publishing needs
-          # Node >= 22.14. The gate below therefore runs on a newer Node than CI does;
-          # that is the point of running it here at all, and `engines` still declares >= 18.
+          # Node >= 22.14. The gate below therefore runs on a newer Node than CI does; that is
+          # the point of running it here at all, and `engines` still declares >= 18.
           #
           # No `registry-url`: it exists to write an .npmrc containing
           # `_authToken=${NODE_AUTH_TOKEN}`, and there is no token here to write.
@@ -88,57 +152,24 @@ jobs:
 
       - run: npm ci
 
-      - name: The tag matches the version being published
-        # npm derives the published version from package.json and ignores the tag, so a tag
-        # and a manifest that disagree publish a version nobody asked for under a tag that
-        # points at different code — invisible afterwards, and unfixable, because the
-        # version is burned. Checked before anything is built, so the failure is cheap.
-        shell: bash
-        run: |
-          tag="${{ github.event.inputs.tag || github.ref_name }}"
-          version="v$(node -p "require('./package.json').version")"
-          if [ "$tag" != "$version" ]; then
-            echo "::error::tag $tag does not match package.json version $version"
-            exit 1
-          fi
-
-      - name: Skip if this version is already on the registry
-        # Publishing is not idempotent: a second attempt at a version that exists fails with
-        # EPUBLISHCONFLICT. That is the normal case twice over — v0.1.0 is published by hand
-        # to bring the package into existence (OIDC cannot create one; see CONTRIBUTING.md),
-        # and `workflow_dispatch` exists to re-run a release whose LATER steps failed. Both
-        # should end green and do nothing, not red and do nothing.
-        id: published
-        shell: bash
-        run: |
-          version="$(node -p "require('./package.json').version")"
-          # `npm view` exits nonzero for an unpublished version, which is the answer, not an
-          # error — hence the `|| true` and the test on the output rather than on the status.
-          if [ -n "$(npm view "buildgql@$version" version 2>/dev/null || true)" ]; then
-            echo "::notice::buildgql@$version is already published; skipping"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Lint, format, types, tests, type-perf budget
-        if: steps.published.outputs.skip != 'true'
-        # The same gate CI runs on every PR. Repeated here rather than trusted from the
-        # merge commit: a tag can be pushed to any commit, including one CI never saw.
+        # The same gate CI runs on every PR. Repeated here rather than trusted from the merge
+        # commit: a tag can be pushed to any commit, including one CI never saw.
         run: npm run check
 
       - name: The built binary actually runs
-        if: steps.published.outputs.skip != 'true'
         shell: bash
         run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
 
       - name: Publish to npm
-        # Authenticated by TRUSTED PUBLISHING: npm exchanges the workflow's OIDC token for a
-        # short-lived, package-scoped credential. There is deliberately no NPM_TOKEN secret
-        # in this repository — a CI token is a long-lived credential that bypasses the
-        # account's 2FA, which is the thing npm now warns about when you create one.
+        # Authenticated by TRUSTED PUBLISHING: npm exchanges this job's OIDC token for a
+        # short-lived, package-scoped credential. There is deliberately no NPM_TOKEN secret in
+        # this repository — a CI token is a long-lived credential that bypasses the account's
+        # 2FA, which is the thing npm warns about when you create one.
         #
         # Nothing here names the trusted publisher; the trust relationship is configured on
-        # npmjs.com against this repository AND this workflow's filename. Renaming this file
-        # breaks publishing until the setting is updated to match.
+        # npmjs.com against this repository, this workflow's filename, and the `production`
+        # environment. Renaming this file breaks publishing until that setting is updated.
         #
         # No `--provenance` flag: trusted publishing attaches provenance by default. `--access
         # public` is redundant with `publishConfig` in package.json and stated anyway, since
@@ -146,5 +177,4 @@ jobs:
         #
         # `prepack` rebuilds `dist` as part of `npm publish`, so the tarball is always built
         # from this checkout — `dist` is gitignored and never comes from the repository.
-        if: steps.published.outputs.skip != 'true'
         run: npm publish --access public

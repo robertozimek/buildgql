@@ -91,29 +91,51 @@ So the very first version is published by hand, and every version after it by th
 3. Same page, **Publishing access → Require two-factor authentication or trusted publishing**.
    That is what actually forbids a token from publishing, rather than merely not having one.
 4. In the repository, **Settings → Environments → production → Deployment branches and tags**:
-   add a **tag** rule for `v*`. It must be a tag rule, not a branch rule — this workflow is
-   triggered by a tag push, so its `github.ref` is `refs/tags/v0.1.0` and a `main`-only branch
-   rule would reject every release. Anything else that belongs on a release (required
-   reviewers, a wait timer) goes here too.
+   allow **both** the `main` branch and the `v*` **tag** pattern. Both are needed because a
+   release can be triggered by either event — see below. Anything else that belongs on a
+   release (required reviewers, a wait timer) goes here too.
 
-"Released only from main" is deliberately _not_ one of those rules, because a tag ref carries
-no branch to match against. The workflow proves it directly instead, by requiring the tagged
-commit to be an ancestor of `main`.
+"Released only from main" is deliberately _not_ one of those rules. A tag ref carries no
+branch to match against, so no ref pattern can express it; the `gate` job proves it directly
+by requiring the tagged commit to be an ancestor of `main`. That job sits outside the
+environment on purpose — every push to `main` reaches this workflow, and an environment with
+required reviewers would turn each of those into a pending deployment awaiting approval.
 
 ### Cutting a release
 
+A release needs two things to be true — a `v*` tag exists, and the commit it points at is on
+`main` — and they may become true in either order. Both events trigger the workflow, and each
+run asks the same question, so either order works:
+
 ```bash
+# From main: the tag push publishes immediately.
 npm version patch   # or minor / major — writes package.json and creates the v* tag
 git push --follow-tags
 ```
 
-The workflow refuses to publish if the tagged commit is not on `main`, or if the tag and
-`package.json` disagree, then runs the full
-`npm run check` gate before publishing — on Node 22, since trusted publishing needs
-Node >= 22.14 and npm >= 11.5.1 (Node 22 ships npm 10.9, so the workflow upgrades npm
-itself). `engines` still declares Node >= 18 for consumers, and `ci.yml` still checks on 20. `prepack` rebuilds `dist/` as part of `npm publish`,
-so the tarball never depends on whatever happened to be in a working tree — `dist/` is
-gitignored and `files` ships nothing else.
+```bash
+# From a version-bump branch: the tag push does nothing (a notice, a green run), and the
+# push to main that merges the PR publishes.
+npm version minor && git push --follow-tags && gh pr create
+```
+
+Tagging an unmerged commit is therefore not an error and does not fail a run. The only hard
+failure in the gate is a tag that disagrees with `package.json`: npm derives the published
+version from the manifest and ignores the tag, so that combination would publish a version
+nobody asked for under a tag pointing at different code — and a version can never be
+republished. A run also ends quietly when the version is already on npm, which every later
+push to `main` would otherwise hit.
+
+Merge with a merge commit rather than a squash for a version-bump PR. A squash rewrites the
+commit, so the tag is left pointing at one that never reaches `main` and the release waits
+forever. If that happens, move the tag onto the squashed commit and push it again.
+
+Once it publishes, the job runs the full `npm run check` gate first — on Node 22, since
+trusted publishing needs Node >= 22.14 and npm >= 11.5.1 (Node 22 ships npm 10.9, so the
+workflow upgrades npm itself). `engines` still declares Node >= 18 for consumers, and
+`ci.yml` still checks on 20. `prepack` rebuilds `dist/` as part of `npm publish`, so the
+tarball never depends on whatever happened to be in a working tree — `dist/` is gitignored
+and `files` ships nothing else.
 
 Verify a release candidate locally with `npm pack` and run the tarball the way a user
 would (`npx ./buildgql-<version>.tgz generate` in a scratch project); `test/built/**` covers
