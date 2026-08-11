@@ -7,8 +7,9 @@ on:
   push:
     tags: ['v*']
   # `workflow_dispatch` exists for re-running a release whose publish step failed AFTER the
-  # tag was already pushed (a flaky registry, an expired token). It takes the same path and
-  # the same guards; nothing here reads the tag except the guard below.
+  # tag was already pushed — a flaky registry, or a trusted publisher that was not configured
+  # yet. It takes the same path and the same guards; nothing here reads the tag except the
+  # guards below.
   workflow_dispatch:
     inputs:
       tag:
@@ -19,9 +20,10 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      # `id-token: write` is what mints the OIDC token npm exchanges for a provenance
-      # attestation. Without it `npm publish --provenance` fails outright rather than
-      # quietly publishing an unattested tarball.
+      # `id-token: write` is what mints the OIDC token npm exchanges for the short-lived
+      # publish credential — it is the ENTIRE authentication story here, not a hardening
+      # extra, and the same token is what provenance is attested against. Without it there
+      # is nothing to publish with, since the repository holds no npm token.
       id-token: write
       contents: read
     steps:
@@ -62,12 +64,31 @@ jobs:
             exit 1
           fi
 
+      - name: Skip if this version is already on the registry
+        # Publishing is not idempotent: a second attempt at a version that exists fails with
+        # EPUBLISHCONFLICT. That is the normal case twice over — v0.1.0 is published by hand
+        # to bring the package into existence (OIDC cannot create one; see CONTRIBUTING.md),
+        # and `workflow_dispatch` exists to re-run a release whose LATER steps failed. Both
+        # should end green and do nothing, not red and do nothing.
+        id: published
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          # `npm view` exits nonzero for an unpublished version, which is the answer, not an
+          # error — hence the `|| true` and the test on the output rather than on the status.
+          if [ -n "$(npm view "buildql@$version" version 2>/dev/null || true)" ]; then
+            echo "::notice::buildql@$version is already published; skipping"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Lint, format, types, tests, type-perf budget
+        if: steps.published.outputs.skip != 'true'
         # The same gate CI runs on every PR. Repeated here rather than trusted from the
         # merge commit: a tag can be pushed to any commit, including one CI never saw.
         run: npm run check
 
       - name: The built binary actually runs
+        if: steps.published.outputs.skip != 'true'
         shell: bash
         run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
 
@@ -87,4 +108,5 @@ jobs:
         #
         # `prepack` rebuilds `dist` as part of `npm publish`, so the tarball is always built
         # from this checkout — `dist` is gitignored and never comes from the repository.
+        if: steps.published.outputs.skip != 'true'
         run: npm publish --access public
