@@ -53,14 +53,14 @@ const pkg = JSON.parse(readFileSync(new URL('package.json', repoRoot), 'utf8')) 
   typesVersions: Record<string, Record<string, string[]>>;
 };
 
-/** The shape both `buildql` and `buildql/client` expose; only the errors matter here. */
+/** The shape both `buildgql` and `buildgql/client` expose; only the errors matter here. */
 interface ErrorExports {
-  BuildQLError: new (message: string) => Error;
-  BuildQLHttpError: new (status: number, body: string) => Error;
-  BuildQLResponseError: new (errors: readonly { message: string }[], data?: unknown) => Error;
+  BuildGQLError: new (message: string) => Error;
+  BuildGQLHttpError: new (status: number, body: string) => Error;
+  BuildGQLResponseError: new (errors: readonly { message: string }[], data?: unknown) => Error;
 }
 
-const ERROR_NAMES = ['BuildQLError', 'BuildQLHttpError', 'BuildQLResponseError'] as const;
+const ERROR_NAMES = ['BuildGQLError', 'BuildGQLHttpError', 'BuildGQLResponseError'] as const;
 
 /** Every built file this suite reaches for, so an unbuilt tree fails once and by name. */
 const REQUIRED = [
@@ -121,7 +121,7 @@ beforeAll(() => {
   const missing = REQUIRED.filter((rel) => !existsSync(`${distDir}${rel}`));
   if (missing.length > 0) {
     throw new Error(
-      `buildql: dist/ is missing ${missing.join(', ')} — this suite asserts on built output. ` +
+      `buildgql: dist/ is missing ${missing.join(', ')} — this suite asserts on built output. ` +
         'Run `npm run build` first (`npm run check` does it for you).',
     );
   }
@@ -133,14 +133,14 @@ async function importDist(rel: string): Promise<ErrorExports> {
 
 describe('cross-entry error class identity', () => {
   // A consumer can obtain these three classes from EITHER entry: `src/index.ts` re-exports
-  // all of them and `buildql/client` exports them too. If the two entries hold separate
-  // copies, `catch (e) { if (e instanceof BuildQLError) }` — the single reason the base
+  // all of them and `buildgql/client` exports them too. If the two entries hold separate
+  // copies, `catch (e) { if (e instanceof BuildGQLError) }` — the single reason the base
   // class exists — silently returns false for anything thrown by the other entry.
 
   // Each loop asserts PRESENCE before identity. `toBe` alone passes vacuously as
   // `undefined === undefined`, so dropping a class from BOTH barrels — the likeliest
   // way to lose one on a branch whose subject is barrel restructuring — would satisfy
-  // the identity check while deleting the export outright. `BuildQLResponseError` in
+  // the identity check while deleting the export outright. `BuildGQLResponseError` in
   // particular is never dereferenced anywhere else in this file.
 
   it('holds for CJS consumers (tsup does not split CJS unless told to)', () => {
@@ -152,8 +152,8 @@ describe('cross-entry error class identity', () => {
       expect(client[name], `${name} is missing from dist/client/index.cjs`).toBeTypeOf('function');
       expect(client[name]).toBe(root[name]);
     }
-    expect(new client.BuildQLHttpError(500, 'x')).toBeInstanceOf(root.BuildQLError);
-    expect(new root.BuildQLHttpError(500, 'x')).toBeInstanceOf(client.BuildQLError);
+    expect(new client.BuildGQLHttpError(500, 'x')).toBeInstanceOf(root.BuildGQLError);
+    expect(new root.BuildGQLHttpError(500, 'x')).toBeInstanceOf(client.BuildGQLError);
   });
 
   it('holds for ESM consumers', async () => {
@@ -167,7 +167,7 @@ describe('cross-entry error class identity', () => {
       expect(client[name], `${name} is missing from dist/client/index.js`).toBeTypeOf('function');
       expect(client[name]).toBe(root[name]);
     }
-    expect(new client.BuildQLHttpError(500, 'x')).toBeInstanceOf(root.BuildQLError);
+    expect(new client.BuildGQLHttpError(500, 'x')).toBeInstanceOf(root.BuildGQLError);
   });
 });
 
@@ -217,13 +217,13 @@ describe('published entry points', () => {
   });
 
   it('keeps the shebang on the CLI binary that `bin` points at', () => {
-    const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
+    const bin = fileURLToPath(new URL(pkg.bin.buildgql, repoRoot));
     expect(readFileSync(bin, 'utf8').startsWith('#!/usr/bin/env node')).toBe(true);
   });
 
   it('ships no CJS or declaration build of the CLI binary, which nothing can reach', () => {
     // `bin` names exactly one file and npm invokes that path directly; `bin.ts` has no
-    // `exports` subpath, so `require('buildql/bin')` fails with ERR_PACKAGE_PATH_NOT_EXPORTED
+    // `exports` subpath, so `require('buildgql/bin')` fails with ERR_PACKAGE_PATH_NOT_EXPORTED
     // whatever is on disk. A `bin.cjs` therefore had no possible caller, and `bin.ts`
     // exports nothing, so its declarations were a file containing only the shebang line.
     // All three shipped in the tarball anyway until `tsup.config.ts` gave `bin.ts` its own
@@ -243,7 +243,7 @@ describe('published entry points', () => {
     expect(entries.length).toBe(BUNDLE_SUBPATHS.length);
     for (const [sub, abs] of entries) {
       const mod = requireDist(abs) as Record<string, unknown>;
-      expect(Object.keys(mod).length, `buildql${sub.slice(1)} loaded but exported nothing`).toBeGreaterThan(
+      expect(Object.keys(mod).length, `buildgql${sub.slice(1)} loaded but exported nothing`).toBeGreaterThan(
         0,
       );
     }
@@ -270,7 +270,7 @@ describe('published entry points', () => {
   // binary...`) is the one that actually covers the shebang, by reading the file's first
   // bytes.
   it('runs as a real child process and prints usage on --help', async () => {
-    const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
+    const bin = fileURLToPath(new URL(pkg.bin.buildgql, repoRoot));
     const { stdout } = await execFileAsync(process.execPath, [bin, '--help']);
     expect(stdout).toContain('type-safe GraphQL query builder codegen');
   });
@@ -284,7 +284,7 @@ describe('published entry points', () => {
   // deliberately-unknown command forces the failing path and asserts on `execFile`'s own
   // rejection, which `promisify` produces only for a nonzero exit code.
   it('exits nonzero when the command fails, not just zero when it succeeds', async () => {
-    const bin = fileURLToPath(new URL(pkg.bin.buildql, repoRoot));
+    const bin = fileURLToPath(new URL(pkg.bin.buildgql, repoRoot));
     await expect(execFileAsync(process.execPath, [bin, 'bogus'])).rejects.toMatchObject({ code: 1 });
   });
 });
@@ -346,7 +346,7 @@ describe('the optional `graphql` peer dependency stays out of the core entries',
         for (const [file, source] of reachableFrom(abs)) {
           expect(
             source,
-            `buildql${sub.slice(1)} reaches ${relative(distDir, file)}, which imports graphql`,
+            `buildgql${sub.slice(1)} reaches ${relative(distDir, file)}, which imports graphql`,
           ).not.toMatch(GRAPHQL_SPECIFIER);
         }
       }
@@ -384,10 +384,10 @@ describe('loadConfig, called from the built bundles', () => {
 
   function withConfigDir(run: (dir: string) => Promise<void>): () => Promise<void> {
     return async () => {
-      const dir = mkdtempSync(join(tmpdir(), 'buildql-config-'));
+      const dir = mkdtempSync(join(tmpdir(), 'buildgql-config-'));
       try {
         writeFileSync(
-          join(dir, 'buildql.config.mjs'),
+          join(dir, 'buildgql.config.mjs'),
           "export default { schema: './schema.graphql', output: './out' };\n",
         );
         await run(dir);
@@ -402,22 +402,22 @@ describe('loadConfig, called from the built bundles', () => {
   }
 
   it(
-    'resolves a real buildql.config.mjs from the CJS bundle',
+    'resolves a real buildgql.config.mjs from the CJS bundle',
     withConfigDir(async (dir) => {
       const mod = requireDist(`${distDir}cli/config.cjs`) as ConfigModule;
       const loaded = await mod.loadConfig(dir);
       expect(loaded.config.schema).toBe('./schema.graphql');
-      expect(loaded.path).toBe(join(dir, 'buildql.config.mjs'));
+      expect(loaded.path).toBe(join(dir, 'buildgql.config.mjs'));
     }),
   );
 
   it(
-    'resolves a real buildql.config.mjs from the ESM bundle',
+    'resolves a real buildgql.config.mjs from the ESM bundle',
     withConfigDir(async (dir) => {
       const mod = (await import(pathToFileURL(`${distDir}cli/config.js`).href)) as unknown as ConfigModule;
       const loaded = await mod.loadConfig(dir);
       expect(loaded.config.schema).toBe('./schema.graphql');
-      expect(loaded.path).toBe(join(dir, 'buildql.config.mjs'));
+      expect(loaded.path).toBe(join(dir, 'buildgql.config.mjs'));
     }),
   );
 });

@@ -126,7 +126,7 @@ export function resolveScalars(
     if (seen !== undefined) {
       if (seen !== source) {
         throw new Error(
-          `buildql: two scalars both map to a TypeScript type named "${entry.name}", from different ` +
+          `buildgql: two scalars both map to a TypeScript type named "${entry.name}", from different ` +
             `sources (${seen} and ${source}). Give one of them a different "name".`,
         );
       }

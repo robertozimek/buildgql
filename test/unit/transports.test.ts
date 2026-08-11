@@ -5,7 +5,7 @@ import { createClient } from '../../src/client/index.js';
 import { sseTransport } from '../../src/client/sse-transport.js';
 import { wsTransport } from '../../src/client/ws-transport.js';
 import type { SubscriptionTransport } from '../../src/client/transport.js';
-import { BuildQLHttpError } from '../../src/client/errors.js';
+import { BuildGQLHttpError } from '../../src/client/errors.js';
 
 const Msg = { id: leafField<'id', ['!'], string>('id', ['!']) };
 const subscription = makeSubscription({ messages: objectField('messages', ['!'], Msg) });
@@ -116,7 +116,7 @@ it('throws instead of completing silently when an SSE stream ends mid-event', as
       /* nothing should ever be yielded */
     }
   };
-  await expect(drain()).rejects.toThrow('buildql: subscription stream ended before completing');
+  await expect(drain()).rejects.toThrow('buildgql: subscription stream ended before completing');
 });
 
 /**
@@ -204,7 +204,7 @@ class FakeWebSocket extends EventTarget implements WebSocket {
  */
 class ThrowingSendWebSocket extends FakeWebSocket {
   override send(): void {
-    throw new Error('buildql: socket is not open');
+    throw new Error('buildgql: socket is not open');
   }
 }
 
@@ -277,7 +277,7 @@ it('surfaces the server-provided detail from a WS `error` message', async () => 
   });
 
   await expect(first).rejects.toMatchObject({
-    name: 'BuildQLResponseError',
+    name: 'BuildGQLResponseError',
     message: expect.stringContaining('Syntax Error: Unexpected Name "bogus"'),
     errors: [{ message: 'Syntax Error: Unexpected Name "bogus"' }],
   });
@@ -303,7 +303,7 @@ it('throws when the WS socket closes without a complete message (abnormal close)
   // The socket goes away (network drop, code 1006) without ever sending `complete`.
   const second = iterator.next();
   socket.onclose?.call(socket, new FakeCloseEvent('close', { code: 1006, wasClean: false }));
-  await expect(second).rejects.toThrow('buildql: subscription stream ended before completing');
+  await expect(second).rejects.toThrow('buildgql: subscription stream ended before completing');
 });
 
 it('keeps the first WS failure when an abnormal close follows a socket error', async () => {
@@ -329,7 +329,7 @@ it('keeps the first WS failure when an abnormal close follows a socket error', a
   socket.onerror?.call(socket, new Event('error'));
   socket.onclose?.call(socket, new FakeCloseEvent('close', { code: 1006, wasClean: false }));
 
-  await expect(first).rejects.toThrow('buildql: subscription socket error');
+  await expect(first).rejects.toThrow('buildgql: subscription socket error');
 });
 
 it('does not leave an unhandled rejection when onopen fails to send, and surfaces the failure instead', async () => {
@@ -348,7 +348,7 @@ it('does not leave an unhandled rejection when onopen fails to send, and surface
   // awaits it. If the synchronous throw from `send` weren't caught, this `await`
   // would itself reject (and in a real app, nothing would be there to catch it).
   await expect(socket.onopen?.call(socket, new Event('open'))).resolves.toBeUndefined();
-  await expect(first).rejects.toThrow('buildql: socket is not open');
+  await expect(first).rejects.toThrow('buildgql: socket is not open');
 });
 
 it('yields a queued `next` value even when `complete` arrives in the same turn, before the consumer drains', async () => {
@@ -429,7 +429,7 @@ it('resolves a function-form `headers` option before handing them to the transpo
   expect(seenHeaders[0]?.get('x-sub-only')).toBe('sub');
 });
 
-it('throws BuildQLHttpError (not a bare Error) when the SSE handshake fails with a non-2xx status', async () => {
+it('throws BuildGQLHttpError (not a bare Error) when the SSE handshake fails with a non-2xx status', async () => {
   const fetchMock = vi.fn<typeof fetch>(async () => new Response('nope', { status: 503 }));
   const client = createClient({
     url: 'http://x/graphql',
@@ -442,9 +442,9 @@ it('throws BuildQLHttpError (not a bare Error) when the SSE handshake fails with
     }
   };
   const err = await drain().catch((e: unknown) => e);
-  expect(err).toBeInstanceOf(BuildQLHttpError);
-  expect((err as BuildQLHttpError).status).toBe(503);
-  expect((err as BuildQLHttpError).body).toBe('nope');
+  expect(err).toBeInstanceOf(BuildGQLHttpError);
+  expect((err as BuildGQLHttpError).status).toBe(503);
+  expect((err as BuildGQLHttpError).body).toBe('nope');
 });
 
 it('aborts the transport signal immediately when the caller signal is already aborted', async () => {

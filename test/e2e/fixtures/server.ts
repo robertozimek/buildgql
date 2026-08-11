@@ -51,7 +51,7 @@ const typeDefs = /* GraphQL */ `
 
 /**
  * A custom scalar that transports its JSON value untouched. Enough for a codegen end-to-end:
- * what is under test is the *types* buildql generates for a scalar, not the server's coercion.
+ * what is under test is the *types* buildgql generates for a scalar, not the server's coercion.
  * `parseLiteral` is left at its default (`valueFromASTUntyped`), which already handles object
  * and list literals.
  */

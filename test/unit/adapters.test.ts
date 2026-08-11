@@ -81,7 +81,7 @@ describe('apollo adapter', () => {
   it('defaults variables to an empty object when the operation declares none', () => {
     // Matches `client.execute`, which also sends `variables: {}` rather than omitting
     // the key — Apollo uses `variables` for cache keying, and `undefined` vs `{}` would
-    // make buildql's two client paths disagree about the same operation.
+    // make buildgql's two client paths disagree about the same operation.
     expect(toApolloQuery(Users).variables).toEqual({});
   });
 
@@ -96,13 +96,13 @@ describe('apollo adapter', () => {
 
   it('rejects a query passed to toApolloMutation', () => {
     expect(() => toApolloMutation(Users as never)).toThrow(
-      /buildql: toApolloMutation\(\) expects a mutation operation, but "Users" is a query/,
+      /buildgql: toApolloMutation\(\) expects a mutation operation, but "Users" is a query/,
     );
   });
 
   it('rejects a mutation passed to toApolloQuery', () => {
     expect(() => toApolloQuery(CreateUser as never)).toThrow(
-      /buildql: toApolloQuery\(\) expects a query or subscription operation, but "CreateUser" is a mutation/,
+      /buildgql: toApolloQuery\(\) expects a query or subscription operation, but "CreateUser" is a mutation/,
     );
   });
 });
@@ -137,8 +137,8 @@ describe('client registry', () => {
     const pkg = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
     for (const kind of CLIENT_KINDS) {
       const { module, names } = CLIENT_EMITS[kind];
-      if (!module || module === 'buildql') continue;
-      const subpath = module.replace('buildql', '.');
+      if (!module || module === 'buildgql') continue;
+      const subpath = module.replace('buildgql', '.');
       expect(pkg.exports[subpath], `${module} is not in package.json exports`).toBeDefined();
       const typesKey = subpath.slice(2);
       expect(pkg.typesVersions['*'][typesKey]).toBeDefined();

@@ -1,5 +1,5 @@
 {
-  "name": "buildql",
+  "name": "buildgql",
   "version": "0.1.0",
   "description": "Type-safe GraphQL query builder generated from introspection",
   "license": "MIT",
@@ -11,15 +11,23 @@
     "query-builder",
     "type-safe"
   ],
+  "author": "Robert Ozimek",
+  "homepage": "https://github.com/robertozimek/buildgql#readme",
+  "bugs": {
+    "url": "https://github.com/robertozimek/buildgql/issues"
+  },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/robertozimek/buildql.git"
+    "url": "git+https://github.com/robertozimek/buildgql.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "sideEffects": [
     "./dist/cli/bin.js"
   ],
   "bin": {
-    "buildql": "./dist/cli/bin.js"
+    "buildgql": "./dist/cli/bin.js"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -98,6 +106,7 @@
   ],
   "scripts": {
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "prepack": "npm run build",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -112,6 +121,9 @@
   },
   "peerDependenciesMeta": {
     "graphql": {
+      "optional": true
+    },
+    "typescript": {
       "optional": true
     }
   },

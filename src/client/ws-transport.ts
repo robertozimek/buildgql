@@ -1,5 +1,5 @@
 import { AsyncQueue } from './async-queue.js';
-import { BuildQLResponseError } from './errors.js';
+import { BuildGQLResponseError } from './errors.js';
 import type { GraphQLFormattedError } from './errors.js';
 import type { StreamChunk, SubscriptionTransport } from './transport.js';
 
@@ -55,7 +55,7 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
           // — surface it via the same error type the `next`-with-`errors` path uses,
           // instead of discarding the server's diagnostics.
           const errors: readonly GraphQLFormattedError[] = Array.isArray(msg.payload) ? msg.payload : [];
-          queue.fail(new BuildQLResponseError(errors, undefined));
+          queue.fail(new BuildGQLResponseError(errors, undefined));
         } else if (msg.type === 'complete') {
           completed = true;
           queue.close();
@@ -63,7 +63,7 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
       };
 
       socket.onerror = () => {
-        queue.fail(new Error('buildql: subscription socket error'));
+        queue.fail(new Error('buildgql: subscription socket error'));
       };
 
       socket.onclose = () => {
@@ -73,7 +73,7 @@ export function wsTransport(opts: WsTransportOptions): SubscriptionTransport {
         // already-recorded failure wins; and we don't flag truncation if we're the
         // ones who closed it via `abort`.
         if (!completed && !aborted) {
-          queue.fail(new Error('buildql: subscription stream ended before completing'));
+          queue.fail(new Error('buildgql: subscription stream ended before completing'));
         }
         queue.close();
       };

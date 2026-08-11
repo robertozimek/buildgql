@@ -1,4 +1,4 @@
-import { BuildQLHttpError } from './errors.js';
+import { BuildGQLHttpError } from './errors.js';
 import { mergeHeaders, resolveHeaders } from './headers.js';
 import type { HeadersSource } from './headers.js';
 import type { StreamChunk, SubscriptionTransport } from './transport.js';
@@ -55,7 +55,7 @@ export function sseTransport(opts: SseTransportOptions): SubscriptionTransport {
         signal,
       });
       if (!res.ok || !res.body) {
-        throw new BuildQLHttpError(res.status, await res.text().catch(() => ''));
+        throw new BuildGQLHttpError(res.status, await res.text().catch(() => ''));
       }
       let completed = false;
       for await (const evt of sseEvents(res.body)) {
@@ -71,7 +71,7 @@ export function sseTransport(opts: SseTransportOptions): SubscriptionTransport {
       // clean finish — otherwise a dropped connection is silently indistinguishable
       // from a subscription that legitimately has nothing more to send.
       if (!completed) {
-        throw new Error('buildql: subscription stream ended before completing');
+        throw new Error('buildgql: subscription stream ended before completing');
       }
     },
   };

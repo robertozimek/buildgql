@@ -140,12 +140,12 @@ function assertNonEmptyString(
   value: unknown,
 ): asserts value is string {
   if (typeof value !== 'string' || value.length === 0) {
-    throw new Error(`buildql: ${configName}'s "scalars.${scalar}.${key}" must be a non-empty string`);
+    throw new Error(`buildgql: ${configName}'s "scalars.${scalar}.${key}" must be a non-empty string`);
   }
 }
 
 /**
- * Throws a field-specific `buildql:`-prefixed error unless every `scalars` entry is a non-empty
+ * Throws a field-specific `buildgql:`-prefixed error unless every `scalars` entry is a non-empty
  * TypeScript type string, or one of the three object shapes documented on `ScalarTypeConfig`.
  * Every message names the offending scalar, because the alternative — finding out at `tsc` time
  * from a generated file the user did not write — is exactly what this exists to prevent.
@@ -155,25 +155,25 @@ export function assertScalarsConfig(
   value: unknown,
 ): asserts value is Record<string, ScalarConfig> {
   if (!isPlainRecord(value)) {
-    throw new Error(`buildql: ${configName}'s "scalars" must be a record keyed by GraphQL scalar name`);
+    throw new Error(`buildgql: ${configName}'s "scalars" must be a record keyed by GraphQL scalar name`);
   }
   for (const [scalar, entry] of Object.entries(value)) {
     if (typeof entry === 'string') {
       if (entry.length === 0) {
-        throw new Error(`buildql: ${configName}'s "scalars.${scalar}" must not be an empty string`);
+        throw new Error(`buildgql: ${configName}'s "scalars.${scalar}" must not be an empty string`);
       }
       continue;
     }
     if (!isPlainRecord(entry)) {
       throw new Error(
-        `buildql: ${configName}'s "scalars.${scalar}" must be a TypeScript type string, or an object ` +
+        `buildgql: ${configName}'s "scalars.${scalar}" must be a TypeScript type string, or an object ` +
           `with "input"/"output", "name" + "from", or "name" + "declare"`,
       );
     }
     for (const key of Object.keys(entry)) {
       if (!(SCALAR_KEYS as readonly string[]).includes(key)) {
         throw new Error(
-          `buildql: ${configName}'s "scalars.${scalar}" has an unknown key "${key}" — expected one of ` +
+          `buildgql: ${configName}'s "scalars.${scalar}" has an unknown key "${key}" — expected one of ` +
             SCALAR_KEYS.map((k) => `"${k}"`).join(', '),
         );
       }
@@ -182,7 +182,7 @@ export function assertScalarsConfig(
     const { name, from, declare, input, output } = entry;
     if (from !== undefined && declare !== undefined) {
       throw new Error(
-        `buildql: ${configName}'s "scalars.${scalar}" sets both "from" and "declare" — a type is ` +
+        `buildgql: ${configName}'s "scalars.${scalar}" sets both "from" and "declare" — a type is ` +
           `either imported or declared, not both`,
       );
     }
@@ -193,7 +193,7 @@ export function assertScalarsConfig(
       // do not apply to them. Only `from` lands inside a quoted string literal.
       if (UNSAFE_IN_QUOTED_SPECIFIER.test(from)) {
         throw new Error(
-          `buildql: ${configName}'s "scalars.${scalar}.from" ("${from}") contains a character ` +
+          `buildgql: ${configName}'s "scalars.${scalar}.from" ("${from}") contains a character ` +
             `("'", '"', a backslash, or a newline) that cannot appear there — "from" is emitted ` +
             `inside a quoted module specifier. Use forward slashes even for a Windows-style path.`,
         );
@@ -207,18 +207,18 @@ export function assertScalarsConfig(
       assertNonEmptyString(configName, scalar, 'name', name);
       if (!IDENTIFIER.test(name)) {
         throw new Error(
-          `buildql: ${configName}'s "scalars.${scalar}.name" ("${name}") is not a valid TypeScript identifier`,
+          `buildgql: ${configName}'s "scalars.${scalar}.name" ("${name}") is not a valid TypeScript identifier`,
         );
       }
       if (RESERVED_NAMES.has(name)) {
         throw new Error(
-          `buildql: ${configName}'s "scalars.${scalar}.name" ("${name}") is a reserved word and cannot be ` +
+          `buildgql: ${configName}'s "scalars.${scalar}.name" ("${name}") is a reserved word and cannot be ` +
             `spliced into "import type { ${name} }" or "export type ${name} = ..." — choose a different name`,
         );
       }
       if (from === undefined && declare === undefined) {
         throw new Error(
-          `buildql: ${configName}'s "scalars.${scalar}" sets "name" but neither "from" nor "declare" — ` +
+          `buildgql: ${configName}'s "scalars.${scalar}" sets "name" but neither "from" nor "declare" — ` +
             `nothing in the generated module would declare that type`,
         );
       }
@@ -228,12 +228,12 @@ export function assertScalarsConfig(
       // `input`/`output` fallback (see `toMapping` in `codegen/scalars.ts`) refer to it by.
       // Without it there is a definition with nothing to call it, so the two are required together.
       throw new Error(
-        `buildql: ${configName}'s "scalars.${scalar}" sets "${from !== undefined ? 'from' : 'declare'}" ` +
+        `buildgql: ${configName}'s "scalars.${scalar}" sets "${from !== undefined ? 'from' : 'declare'}" ` +
           `but not "name" — "name" is what the generated module refers to the type by`,
       );
     } else if (input === undefined && output === undefined) {
       throw new Error(
-        `buildql: ${configName}'s "scalars.${scalar}" is empty — set "input"/"output", or "name" ` +
+        `buildgql: ${configName}'s "scalars.${scalar}" is empty — set "input"/"output", or "name" ` +
           `together with "from" or "declare"`,
       );
     }

@@ -14,7 +14,7 @@ export async function resolveHeaders(source: HeadersSource | undefined): Promise
 
 /**
  * Merges `override` onto `base`, last-writer-wins per header name. Per-request headers
- * beat client-level ones everywhere in buildql; this is the single place that rule lives.
+ * beat client-level ones everywhere in buildgql; this is the single place that rule lives.
  */
 export function mergeHeaders(base: HeadersInit, override?: HeadersInit): Headers {
   const headers = new Headers(base);

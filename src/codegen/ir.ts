@@ -85,7 +85,7 @@ function flatten(ref: IntrospectionTypeRef, kinds: ReadonlyMap<string, IRKind>):
       return { wrap, name, kind: kinds.get(name) ?? irKind(cur.kind) };
     }
   }
-  throw new Error('buildql: malformed type reference in introspection result');
+  throw new Error('buildgql: malformed type reference in introspection result');
 }
 
 /** Prints a type ref back to GraphQL syntax, for variable definitions. */

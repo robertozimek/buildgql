@@ -9,7 +9,7 @@ import type { ScalarConfig } from '../codegen/scalars.js';
 export type { ClientKind } from '../codegen/clients.js';
 export type { ScalarConfig, ScalarTypeConfig } from '../codegen/scalars.js';
 
-export interface BuildQLConfig {
+export interface BuildGQLConfig {
   /** URL, path to an introspection .json, or path to an SDL file. */
   readonly schema: string;
   /** Sent with the introspection request when `schema` is a URL. */
@@ -35,20 +35,20 @@ export interface BuildQLConfig {
    */
   readonly scalars?: Record<string, ScalarConfig>;
   /**
-   * Which GraphQL client the generated module binds to. `'buildql'` (the default) re-exports
-   * buildql's own `createClient`; `'apollo'` and `'urql'` re-export that client's adapter
+   * Which GraphQL client the generated module binds to. `'buildgql'` (the default) re-exports
+   * buildgql's own `createClient`; `'apollo'` and `'urql'` re-export that client's adapter
    * instead; `'none'` binds no client at all. Adapters require the `graphql` package.
    */
   readonly client?: ClientKind;
 }
 
-export function defineConfig(config: BuildQLConfig): BuildQLConfig {
+export function defineConfig(config: BuildGQLConfig): BuildGQLConfig {
   return config;
 }
 
 // ESM-first, legacy last: prefer native TS/ESM config formats and fall back to plain .js only
 // when nothing else is present.
-const CANDIDATES = ['buildql.config.ts', 'buildql.config.mts', 'buildql.config.mjs', 'buildql.config.js'];
+const CANDIDATES = ['buildgql.config.ts', 'buildgql.config.mts', 'buildgql.config.mjs', 'buildgql.config.js'];
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -59,7 +59,7 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
-/** Narrows a value coming from `typeof config === 'object'` down to a plain BuildQLConfig-shaped record. */
+/** Narrows a value coming from `typeof config === 'object'` down to a plain BuildGQLConfig-shaped record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -94,27 +94,27 @@ function isMissingTypeStrippingSupport(err: unknown): boolean {
 }
 
 /**
- * Throws a field-specific `buildql:`-prefixed error unless `value` is a well-formed
- * BuildQLConfig: a non-empty string `schema`, and — when present — a string `output` and a
+ * Throws a field-specific `buildgql:`-prefixed error unless `value` is a well-formed
+ * BuildGQLConfig: a non-empty string `schema`, and — when present — a string `output` and a
  * string-valued `headers` record and a well-formed `scalars` map (see `assertScalarsConfig`).
  */
-function assertBuildQLConfig(
+function assertBuildGQLConfig(
   name: string,
   value: Record<string, unknown>,
-): asserts value is Record<string, unknown> & BuildQLConfig {
+): asserts value is Record<string, unknown> & BuildGQLConfig {
   if (typeof value.schema !== 'string' || value.schema.length === 0) {
-    throw new Error(`buildql: ${name} is missing "schema" — set it to a URL, a .json, or a .graphql file`);
+    throw new Error(`buildgql: ${name} is missing "schema" — set it to a URL, a .json, or a .graphql file`);
   }
   if (value.output !== undefined && typeof value.output !== 'string') {
-    throw new Error(`buildql: ${name}'s "output" must be a string path`);
+    throw new Error(`buildgql: ${name}'s "output" must be a string path`);
   }
   if (value.headers !== undefined && !isStringRecord(value.headers)) {
-    throw new Error(`buildql: ${name}'s "headers" must be a record of string values`);
+    throw new Error(`buildgql: ${name}'s "headers" must be a record of string values`);
   }
   if (value.scalars !== undefined) assertScalarsConfig(name, value.scalars);
   if (value.client !== undefined && !isClientKind(value.client)) {
     throw new Error(
-      `buildql: ${name}'s "client" must be one of ${CLIENT_KINDS.map((k) => `"${k}"`).join(', ')}`,
+      `buildgql: ${name}'s "client" must be one of ${CLIENT_KINDS.map((k) => `"${k}"`).join(', ')}`,
     );
   }
 }
@@ -133,10 +133,10 @@ export async function loadConfig(
   // passes this — `cli/main.ts` calls `loadConfig(cwd)` — so real dynamic `import()`
   // is always what actually resolves a config file outside of tests.
   importModule: ConfigImporter = defaultImporter,
-): Promise<{ config: BuildQLConfig; path: string }> {
+): Promise<{ config: BuildGQLConfig; path: string }> {
   // When a `.ts`/`.mts` candidate exists but fails to load specifically because this
   // Node lacks native TypeScript support, that candidate is skipped rather than
-  // treated as fatal — a project that also ships a working `buildql.config.mjs` (or
+  // treated as fatal — a project that also ships a working `buildgql.config.mjs` (or
   // `.js`) must still work on Node 20. The message is remembered so it can still be
   // shown if nothing else loads either.
   let missingTypeStrippingMessage: string | undefined;
@@ -151,39 +151,39 @@ export async function loadConfig(
     } catch (err) {
       if ((name.endsWith('.ts') || name.endsWith('.mts')) && isMissingTypeStrippingSupport(err)) {
         missingTypeStrippingMessage =
-          `buildql: could not load ${name}. Node must be able to run TypeScript directly ` +
+          `buildgql: could not load ${name}. Node must be able to run TypeScript directly ` +
           `(Node >= 22.6 with --experimental-strip-types, or Node >= 23.6). ` +
-          `Otherwise rename it to buildql.config.mjs. Original error: ${errorMessage(err)}`;
+          `Otherwise rename it to buildgql.config.mjs. Original error: ${errorMessage(err)}`;
         // Surface the skip immediately — don't defer it to the "nothing loaded" path,
-        // which never runs if a later candidate (e.g. buildql.config.mjs) succeeds.
+        // which never runs if a later candidate (e.g. buildgql.config.mjs) succeeds.
         process.stderr.write(
-          `buildql: skipping ${name} — this Node cannot run TypeScript directly. ${errorMessage(err)}\n`,
+          `buildgql: skipping ${name} — this Node cannot run TypeScript directly. ${errorMessage(err)}\n`,
         );
         continue;
       }
-      throw new Error(`buildql: failed to load ${name}: ${errorMessage(err)}`);
+      throw new Error(`buildgql: failed to load ${name}: ${errorMessage(err)}`);
     }
 
     if (!isRecord(mod) || !('default' in mod)) {
-      throw new Error(`buildql: ${name} must have a default export`);
+      throw new Error(`buildgql: ${name} must have a default export`);
     }
     const config = mod.default;
     if (!isRecord(config)) {
-      throw new Error(`buildql: ${name}'s default export must be an object (use defineConfig({...}))`);
+      throw new Error(`buildgql: ${name}'s default export must be an object (use defineConfig({...}))`);
     }
-    assertBuildQLConfig(name, config);
+    assertBuildGQLConfig(name, config);
     return { config, path };
   }
   if (missingTypeStrippingMessage) {
     throw new Error(missingTypeStrippingMessage);
   }
   throw new Error(
-    `buildql: no config found in ${cwd}. Create a buildql.config.ts (or .js) exporting ` +
+    `buildgql: no config found in ${cwd}. Create a buildgql.config.ts (or .js) exporting ` +
       `defineConfig({ schema: 'https://...' | './schema.graphql' }).`,
   );
 }
 
-export function resolveOutputDir(config: BuildQLConfig, cwd: string): string {
+export function resolveOutputDir(config: BuildGQLConfig, cwd: string): string {
   const out = config.output ?? './src/gql';
   return isAbsolute(out) ? out : resolve(cwd, out);
 }

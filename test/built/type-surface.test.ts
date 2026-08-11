@@ -29,7 +29,7 @@ import * as ts from 'typescript';
  * miss it (silently checking the wrong 41 characters). The TypeScript compiler API doesn't
  * have this problem: `checker.getExportsOfModule` resolves re-exports, including aliased
  * and multi-hop ones, down to the name a consumer actually imports — the same resolution
- * `import { AnyFieldSelection } from 'buildql'` goes through in a real consumer's project.
+ * `import { AnyFieldSelection } from 'buildgql'` goes through in a real consumer's project.
  */
 
 const repoRoot = new URL('../../', import.meta.url);
@@ -48,9 +48,9 @@ const EXPECTED_EXPORTS = [
   'Arg',
   'ArgSpec',
   'ArgsInput',
-  'BuildQLError',
-  'BuildQLHttpError',
-  'BuildQLResponseError',
+  'BuildGQLError',
+  'BuildGQLHttpError',
+  'BuildGQLResponseError',
   'Client',
   'ClientOptions',
   'Directive',
@@ -108,7 +108,7 @@ beforeAll(() => {
   // tree rather than silently collecting nothing.
   if (!existsSync(dtsPath)) {
     throw new Error(
-      'buildql: dist/index.d.ts is missing — this suite asserts on built output. ' +
+      'buildgql: dist/index.d.ts is missing — this suite asserts on built output. ' +
         'Run `npm run build` first (`npm run check` does it for you).',
     );
   }
@@ -133,13 +133,13 @@ it('locks the full declared export surface (values and type-only) of dist/index.
 
   const sourceFile = program.getSourceFile(dtsPath);
   if (!sourceFile) {
-    throw new Error(`buildql: TypeScript could not load ${dtsPath} as a source file`);
+    throw new Error(`buildgql: TypeScript could not load ${dtsPath} as a source file`);
   }
 
   const checker = program.getTypeChecker();
   const moduleSymbol = checker.getSymbolAtLocation(sourceFile);
   if (!moduleSymbol) {
-    throw new Error(`buildql: ${dtsPath} has no module symbol — is it still an ES module?`);
+    throw new Error(`buildgql: ${dtsPath} has no module symbol — is it still an ES module?`);
   }
 
   const actual = checker

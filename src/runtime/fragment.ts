@@ -45,7 +45,7 @@ export function collectFragments(sels: readonly SelectionNode[]): FragmentDefini
         const seen = found.get(n.fragment.name);
         if (seen && seen !== n.fragment) {
           throw new Error(
-            `buildql: two different fragments are both named "${n.fragment.name}". ` +
+            `buildgql: two different fragments are both named "${n.fragment.name}". ` +
               'Fragment names must be unique — give one of them a different name.',
           );
         }

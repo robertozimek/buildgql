@@ -16,7 +16,7 @@ async function generated() {
 
 describe('emit', () => {
   it('imports the runtime from the package root', async () => {
-    expect(await generated()).toContain("from 'buildql'");
+    expect(await generated()).toContain("from 'buildgql'");
   });
 
   it('emits a field map per object type', async () => {
@@ -485,12 +485,12 @@ describe('emit', () => {
 
   it('emits nothing extra when no scalar contributes a prelude', async () => {
     // Pins the byte-identical-by-default promise: a config that only uses the string form
-    // must produce exactly what buildql produced before the object form existed.
+    // must produce exactly what buildgql produced before the object form existed.
     expect(await generatedWith({ ID: 'string' })).toBe(await generated());
     // The assertion above cannot catch an unconditional `parts.push(prelude)`: an empty
     // prelude would add the same blank line to both sides. This one can — it pins the exact
     // bytes where the prelude would land if it were ever pushed empty.
-    expect(await generated()).toContain("} from 'buildql';\n\nexport const Query = {");
+    expect(await generated()).toContain("} from 'buildgql';\n\nexport const Query = {");
   });
 
   it('emits a type-only import for an imported scalar type', async () => {
@@ -517,7 +517,7 @@ describe('emit', () => {
 
   it('places the prelude after the runtime import and before the generated types', async () => {
     const src = await generatedWith({ ID: { name: 'PostId', from: '../types/ids' } });
-    expect(src.indexOf("from 'buildql'")).toBeLessThan(src.indexOf("from '../types/ids'"));
+    expect(src.indexOf("from 'buildgql'")).toBeLessThan(src.indexOf("from '../types/ids'"));
     expect(src.indexOf("from '../types/ids'")).toBeLessThan(src.indexOf('export const Post = {'));
   });
 
@@ -533,7 +533,7 @@ describe('emit', () => {
 
   it('throws when a scalar type name collides with a generated schema type', async () => {
     await expect(generatedWith({ ID: { name: 'Post', declare: 'string' } })).rejects.toThrow(
-      /buildql: a "scalars" entry maps to a TypeScript type named "Post"/,
+      /buildgql: a "scalars" entry maps to a TypeScript type named "Post"/,
     );
   });
 
@@ -652,37 +652,37 @@ describe('unmappedScalars', () => {
 });
 
 describe('emit — client option', () => {
-  it('defaults to buildql: imports and re-exports createClient', async () => {
+  it('defaults to buildgql: imports and re-exports createClient', async () => {
     const src = await generated();
     // Pins the whole sorted import block, not just `createClient`'s presence: this is the
-    // plan's #1 binding constraint — `client: 'buildql'` output must stay byte-identical to
+    // plan's #1 binding constraint — `client: 'buildgql'` output must stay byte-identical to
     // what the emitter produced before this feature existed, and a `toContain` on a single
     // line would pass even if the sorted list were reordered around it.
     expect(src).toContain(
       'import {\n  argSpec,\n  createClient,\n  include,\n  leafField,\n  leafFieldArgs,\n  makeFragment,\n' +
         '  makeMutation,\n  makeQuery,\n  makeSubscription,\n  objectField,\n  objectFieldArgs,\n  on,\n' +
-        "  skip,\n  spread,\n  $,\n  v,\n} from 'buildql';\n",
+        "  skip,\n  spread,\n  $,\n  v,\n} from 'buildgql';\n",
     );
     expect(src).toContain('  createClient,\n');
     expect(src).toContain('export { $, v, on, spread, include, skip, createClient };');
-    expect(src).not.toContain('buildql/adapters');
+    expect(src).not.toContain('buildgql/adapters');
   });
 
   it('emits the apollo adapter imports and re-exports', async () => {
     const src = emit(buildIR(await loadSchema(sdlPath)), 'apollo');
     expect(src).toContain(
-      "import { apolloDocument, toApolloMutation, toApolloQuery } from 'buildql/adapters/apollo';",
+      "import { apolloDocument, toApolloMutation, toApolloQuery } from 'buildgql/adapters/apollo';",
     );
     expect(src).toContain(
       'export { $, v, on, spread, include, skip, apolloDocument, toApolloMutation, toApolloQuery };',
     );
-    // buildql's own client must not be bound in when another one was chosen.
+    // buildgql's own client must not be bound in when another one was chosen.
     expect(src).not.toContain('createClient');
   });
 
   it('emits the urql adapter imports and re-exports', async () => {
     const src = emit(buildIR(await loadSchema(sdlPath)), 'urql');
-    expect(src).toContain("import { toUrqlArgs, urqlDocument } from 'buildql/adapters/urql';");
+    expect(src).toContain("import { toUrqlArgs, urqlDocument } from 'buildgql/adapters/urql';");
     expect(src).toContain('export { $, v, on, spread, include, skip, toUrqlArgs, urqlDocument };');
     expect(src).not.toContain('createClient');
   });
@@ -691,14 +691,14 @@ describe('emit — client option', () => {
     const src = emit(buildIR(await loadSchema(sdlPath)), 'none');
     expect(src).toContain('export { $, v, on, spread, include, skip };');
     expect(src).not.toContain('createClient');
-    expect(src).not.toContain('buildql/adapters');
+    expect(src).not.toContain('buildgql/adapters');
   });
 
   it('still emits the runtime builders and the Operation type re-export for every client', async () => {
-    for (const client of ['buildql', 'apollo', 'urql', 'none'] as const) {
+    for (const client of ['buildgql', 'apollo', 'urql', 'none'] as const) {
       const src = emit(buildIR(await loadSchema(sdlPath)), client);
       expect(src).toContain('  makeQuery,\n');
-      expect(src).toContain("export type { Operation } from 'buildql';");
+      expect(src).toContain("export type { Operation } from 'buildgql';");
       expect(src).toContain('export const query = makeQuery(Query)');
     }
   });

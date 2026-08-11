@@ -28,7 +28,7 @@ function splitArgs(argv: Record<string, unknown>, spec: ArgSpec<unknown>): Split
       const varName = explicit ?? key;
       const gqlType = spec.gql[key];
       if (gqlType === undefined) {
-        throw new Error(`buildql: unknown argument "${key}" (no GraphQL type recorded for it)`);
+        throw new Error(`buildgql: unknown argument "${key}" (no GraphQL type recorded for it)`);
       }
       varRefs.push({ varName, gqlType });
       literals[key] = varRefValue(varName);

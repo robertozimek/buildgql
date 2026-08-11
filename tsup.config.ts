@@ -21,8 +21,8 @@ export default defineConfig([
     format: ['esm', 'cjs'],
     // Without this, tsup code-splits ESM but not CJS, so `dist/index.cjs` and
     // `dist/client/index.cjs` each inlined their OWN copy of src/client/errors.ts.
-    // Both entries export those classes, so a consumer who caught `BuildQLError` from
-    // `buildql` got `false` for an error thrown through `buildql/client` — defeating
+    // Both entries export those classes, so a consumer who caught `BuildGQLError` from
+    // `buildgql` got `false` for an error thrown through `buildgql/client` — defeating
     // the point of having a shared base class at all. With splitting on, both `.cjs`
     // bundles require the same generated chunk and identity holds. Pinned by
     // test/built/interop.test.ts, which runs against the built output.
@@ -42,8 +42,8 @@ export default defineConfig([
     // `require(x)`. `loadConfig` calls `import(pathToFileURL(path).href)` — a `file:`
     // URL, which `import()` accepts and `require()` does not:
     //
-    //   buildql: failed to load buildql.config.mjs:
-    //   Cannot find module 'file:///.../buildql.config.mjs'
+    //   buildgql: failed to load buildgql.config.mjs:
+    //   Cannot find module 'file:///.../buildgql.config.mjs'
     //
     // `exports["./config"].require` points at `dist/cli/config.cjs`, so with splitting on
     // this published entry point is dead for every CJS consumer. Splitting buys it nothing
@@ -71,7 +71,7 @@ export default defineConfig([
     // `bin.ts` is reachable ONLY through `package.json`'s `bin` field, which names exactly
     // one file (`./dist/cli/bin.js`), and npm invokes that path directly rather than
     // resolving it as a module. There is no `exports` subpath for it, so every module
-    // specifier a consumer could write — `buildql/bin`, `buildql/cli/bin` — fails with
+    // specifier a consumer could write — `buildgql/bin`, `buildgql/cli/bin` — fails with
     // `ERR_PACKAGE_PATH_NOT_EXPORTED` no matter what is on disk. A `bin.cjs` therefore had
     // no possible caller: it shipped in the tarball, was listed in `sideEffects`, and
     // nothing could load it. Declarations were worse than useless — `bin.ts` exports
@@ -98,7 +98,7 @@ export default defineConfig([
     // `exports` subpath (only `main.ts` and the CLI's own tests import it, both straight
     // from `src/`, not from `dist/`), so building it standalone would ship exactly the kind
     // of unreachable file this config exists to avoid. Its code still ships: esbuild inlines
-    // its whole graph into `bin.js`, which is how `buildql generate` keeps working. If a
+    // its whole graph into `bin.js`, which is how `buildgql generate` keeps working. If a
     // real consumer ever needs to embed the pipeline directly (the reason `reporter.ts`
     // exists as a port in the first place), add `./generate` to `exports` and
     // `typesVersions` and give it an entry — until then it stays internal.

@@ -63,7 +63,7 @@ describe('toOutputRelativeSpecifier', () => {
       sep: '\\',
     };
     expect(() => toOutputRelativeSpecifier('./src/types/money', 'C:\\repo', 'D:\\out', crossDrive)).toThrow(
-      /buildql: cannot rewrite/,
+      /buildgql: cannot rewrite/,
     );
     expect(() => toOutputRelativeSpecifier('./src/types/money', 'C:\\repo', 'D:\\out', crossDrive)).toThrow(
       /C:\\repo/,
@@ -89,7 +89,7 @@ describe('toOutputRelativeSpecifier', () => {
     };
     expect(() =>
       toOutputRelativeSpecifier('C:\\repo\\src\\types\\money', 'C:\\repo', 'D:\\out', crossDrive),
-    ).toThrow(/buildql: cannot rewrite/);
+    ).toThrow(/buildgql: cannot rewrite/);
   });
 
   it('rewrites same-drive Windows paths and emits forward slashes', () => {
