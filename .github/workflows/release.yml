@@ -19,6 +19,21 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Entering the `production` environment is what subjects this job to that environment's
+    # protection rules — required reviewers, wait timers, and the deployment branch/tag rules
+    # that decide which refs may deploy at all. The rules live in the repository settings,
+    # not here, so this line is the whole of the opt-in: without it the job runs unprotected.
+    #
+    # The environment's ref rule has to permit TAGS (`v*`), not the `main` branch: this
+    # workflow is triggered by a tag push, so `github.ref` is `refs/tags/v0.1.0` and a
+    # branch-only rule rejects every release. "Only from main" is a different guarantee, and
+    # is enforced by the ancestry check below rather than by the environment.
+    #
+    # `url` is cosmetic — it turns the environment badge in the Actions UI into a link to
+    # what was published.
+    environment:
+      name: production
+      url: https://www.npmjs.com/package/buildgql
     permissions:
       # `id-token: write` is what mints the OIDC token npm exchanges for the short-lived
       # publish credential — it is the ENTIRE authentication story here, not a hardening
@@ -30,6 +45,29 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.inputs.tag || github.ref }}
+          # Full history, because the ancestry check below needs a merge-base. The default
+          # depth-1 clone has no ancestors to compute one from.
+          fetch-depth: 0
+
+      - name: The tagged commit is on main
+        # A tag can be pushed to ANY commit — a feature branch, a detached experiment, a
+        # commit that only ever existed on someone's laptop — and nothing about the tag
+        # itself records where it came from. `github.ref` is `refs/tags/v0.1.0` on this
+        # trigger, so neither an `if:` on the branch nor a branch-based environment rule can
+        # express "released from main"; both would see a tag and have nothing to compare.
+        #
+        # Reachability is the actual question, and `merge-base --is-ancestor` is what answers
+        # it: the tagged commit must be contained in `main`. That holds for a normal
+        # merge-then-tag, and fails for a tag on unmerged work, which is the mistake worth
+        # catching — the published version is unrepublishable, so code that reached npm
+        # without review cannot be taken back.
+        shell: bash
+        run: |
+          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::$(git rev-parse --short HEAD) is not an ancestor of main — release only merged commits"
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:

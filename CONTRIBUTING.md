@@ -83,10 +83,22 @@ So the very first version is published by hand, and every version after it by th
    for a 2FA one-time password; no token is created at any point. (This one release has no
    provenance attestation — nothing published from a laptop can have one.)
 2. On npmjs.com: **buildgql → Settings → Trusted publisher →** GitHub Actions, repository
-   `robertozimek/buildgql`, workflow filename `release.yml`. The filename must match exactly;
-   renaming the workflow breaks publishing until this is updated.
+   `robertozimek/buildgql`, workflow filename `release.yml`, environment `production`. The
+   filename must match exactly; renaming the workflow breaks publishing until this is
+   updated. Naming the environment means npm rejects an OIDC token minted by a job that did
+   not enter `production`, so the environment's protection rules cannot be sidestepped by
+   adding a second workflow.
 3. Same page, **Publishing access → Require two-factor authentication or trusted publishing**.
    That is what actually forbids a token from publishing, rather than merely not having one.
+4. In the repository, **Settings → Environments → production → Deployment branches and tags**:
+   add a **tag** rule for `v*`. It must be a tag rule, not a branch rule — this workflow is
+   triggered by a tag push, so its `github.ref` is `refs/tags/v0.1.0` and a `main`-only branch
+   rule would reject every release. Anything else that belongs on a release (required
+   reviewers, a wait timer) goes here too.
+
+"Released only from main" is deliberately _not_ one of those rules, because a tag ref carries
+no branch to match against. The workflow proves it directly instead, by requiring the tagged
+commit to be an ancestor of `main`.
 
 ### Cutting a release
 
@@ -95,7 +107,8 @@ npm version patch   # or minor / major — writes package.json and creates the v
 git push --follow-tags
 ```
 
-The workflow refuses to publish if the tag and `package.json` disagree, then runs the full
+The workflow refuses to publish if the tagged commit is not on `main`, or if the tag and
+`package.json` disagree, then runs the full
 `npm run check` gate before publishing — on Node 22, since trusted publishing needs
 Node >= 22.14 and npm >= 11.5.1 (Node 22 ships npm 10.9, so the workflow upgrades npm
 itself). `engines` still declares Node >= 18 for consumers, and `ci.yml` still checks on 20. `prepack` rebuilds `dist/` as part of `npm publish`,
