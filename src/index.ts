@@ -43,4 +43,4 @@ export type { Arg, ArgSpec, ArgsInput, VarMarker, VarProxy, VarsOf } from './typ
 export type { Apply, Wrap, WrapTok } from './types/wrap.js';
 
 /** Kept in step with package.json by `test/unit/public-api.test.ts`. */
-export const VERSION = '0.1.0';
+export const VERSION = '0.1.1';

@@ -10,7 +10,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # The current Active LTS. This is the toolchain's Node, not the runtime floor in
+          # `engines`; the `node18` build target keeps the published output loadable there.
+          node-version: 26
           cache: npm
       - run: npm ci
       - run: npm run check
