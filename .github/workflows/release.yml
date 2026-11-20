@@ -95,7 +95,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 26
           cache: npm
 
       - run: npm ci
@@ -135,19 +135,13 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # 22: trusted publishing needs Node >= 22.14, and the dev toolchain (tsup 9) needs
-          # >= 22.18 to build. `engines` still declares >= 18 for the published output.
+          # The current Active LTS, as in ci.yml. Its bundled npm (11.x) is already new enough
+          # for trusted publishing (>= 11.5.1), so npm is not upgraded separately.
           #
           # No `registry-url`: it exists to write an .npmrc containing
           # `_authToken=${NODE_AUTH_TOKEN}`, and there is no token here to write.
-          node-version: 22
+          node-version: 26
           cache: npm
-
-      - name: npm >= 11.5.1, which is what can exchange the OIDC token
-        # Node 22 ships npm 10.9, and OIDC publishing did not exist until 11.5.1 — without
-        # this the publish step falls back to looking for credentials it will not find, and
-        # fails with an auth error that says nothing about the real cause.
-        run: npm install --global npm@latest
 
       # No `npm run check` here: `verify` already ran it against this exact commit, and this
       # job does not start unless it passed.
