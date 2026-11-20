@@ -1,32 +1,27 @@
 name: Release
 
-# A release needs two things to be true: a `v*` tag exists, and the commit it points at is
-# on `main`. They can become true in either order, so BOTH events are triggers and each run
-# asks the same question — "is there a releasable tag on main that npm does not have yet?"
+# Publishing happens from `main` and nowhere else. Every push to `main` asks one question —
+# "does npm have the version package.json declares?" — and publishes it when the answer is no.
+# Releasing is therefore just merging a version bump; the `vX.Y.Z` tag is created by this
+# workflow AFTER the publish succeeds, as a record of what shipped, never as a trigger.
 #
-# Tag first, merge later, is the normal flow for a version-bump PR: the tag push finds an
-# unmerged commit and does nothing, and the later push to `main` publishes. Tag a commit
-# already on `main` (what `npm version && git push --follow-tags` does) and the tag push
-# publishes immediately. Neither case is an error, because neither is a mistake.
-#
-# What IS an error fails the run, so a red Release means something needs a human:
-#   - the code at the commit being released (or at `main`) does not pass `npm run check`
-#   - `main` declares a version npm does not have, with no tag to release it from — a
-#     version bump merged without its tag, which would otherwise never publish
-#   - on `main`, a tag for the current version that is not on `main` — typically a
-#     tag-first PR that was squash- or rebase-merged, so the tagged commit never lands
+# Anything broken fails the run, so a red Release always means something needs a human:
+#   - the code on `main` does not pass `npm run check` (checked on every push, publishing or not)
 #   - the registry cannot be asked whether the version exists
+#   - a `vX.Y.Z` tag for the unpublished version already exists on a different commit
+#   - the publish itself, or tagging afterwards, fails
 on:
   push:
-    tags: ['v*']
     branches: [main]
-  # For re-running a release whose publish step failed after the tag was already pushed — a
-  # flaky registry, a trusted publisher that was not configured yet.
+  # For retrying a release whose publish step failed — a flaky registry, a trusted publisher
+  # that was not configured yet. Refused from any ref but `main` (see `gate`).
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing version tag to publish, e.g. v0.1.0'
-        required: true
+
+# Two quick merges must not race each other to `npm publish` the same version. Queued, never
+# cancelled: a cancelled run mid-publish is worse than a short wait.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   # Deliberately a SEPARATE job from `publish`, and deliberately outside the `production`
@@ -40,115 +35,56 @@ jobs:
     outputs:
       publish: ${{ steps.decide.outputs.publish }}
       version: ${{ steps.decide.outputs.version }}
-      sha: ${{ steps.decide.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.inputs.tag || github.ref }}
-          # Full history and tags: the checks below need a merge-base, and need to resolve a
-          # tag this run was not triggered by. A depth-1 clone has neither.
+          # Tags, to tell whether this version's tag already exists somewhere else.
           fetch-depth: 0
 
-      - name: Is there a releasable tag on main that npm does not have?
+      - name: Does npm have the version on main?
         id: decide
         shell: bash
-        env:
-          # Through the environment, never `${{ }}` inside the script: a dispatch input is
-          # free text, and interpolating it would splice it into the shell source.
-          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           set -euo pipefail
+
+          # The trigger list already limits pushes to `main`; this catches a manual dispatch
+          # from any other branch, which would otherwise publish unmerged code.
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "::error::releases publish from main only, not $GITHUB_REF"
+            exit 1
+          fi
+
           version="$(node -p "require('./package.json').version")"
           tag="v$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-          # Is $version on npm? Answers yes or no, and FAILS the run when the registry cannot
-          # be asked. `npm view` prints nothing and exits nonzero both for a version that
-          # does not exist and for a registry it could not reach; only E404 is the answer
-          # "no", and treating an outage as "no" would make every check below lie.
-          published() {
-            local out
-            if out="$(npm view "buildgql@$version" version 2>&1)"; then
-              [ -n "$out" ]
-              return
-            fi
-            if grep -q E404 <<<"$out"; then
-              return 1
-            fi
-            echo "::error::could not ask npm whether buildgql@$version exists:"
-            echo "$out"
-            exit 1
-          }
-
-          # A tag this run was explicitly pointed at, if any: the pushed tag, or the one
-          # `workflow_dispatch` names. A push to `main` has neither, and asks the general
-          # question instead.
-          requested="$INPUT_TAG"
-          if [ -z "$requested" ] && [ "${GITHUB_REF_TYPE:-}" = tag ]; then
-            requested="$GITHUB_REF_NAME"
-          fi
-
-          # Naming a tag that disagrees with the manifest IS an error, and the only hard
-          # failure here. npm derives the published version from package.json and ignores the
-          # tag, so this combination publishes a version nobody asked for under a tag pointing
-          # at different code — unfixable afterwards, because a version is never reusable.
-          if [ -n "$requested" ] && [ "$requested" != "$tag" ]; then
-            echo "::error::tag $requested does not match package.json version $version"
-            exit 1
-          fi
-
-          # No tag is only fine when the version is already out. Otherwise `main` carries a
-          # version bump that nothing will ever publish, which is exactly the kind of quiet
-          # breakage this run exists to surface. Pushing the tag fixes it (and publishes).
-          if ! git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null; then
-            if published; then
-              echo "::notice::buildgql@$version is already published"
-              exit 0
-            fi
-            echo "::error::package.json is at $version, which npm does not have, and there is no $tag tag to release it from — push the tag to publish"
-            exit 1
-          fi
-          sha="$(git rev-parse "refs/tags/$tag^{commit}")"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-
-          # The tagged commit must be REACHABLE FROM main. A tag can be pushed to any commit,
-          # and carries no record of where it was cut, so no ref pattern — not an `if:`, not
-          # an environment branch rule — can express "released from main": on a tag push
-          # `github.ref` is `refs/tags/v0.1.0` and there is no branch to match. Ancestry is
-          # the question that actually has an answer.
-          #
-          # On a TAG push, not reachable is the ordinary "tagged on a branch, not merged yet"
-          # case, so it ends this run quietly. The push to `main` that merges it runs this
-          # same check again and publishes then.
-          #
-          # Anywhere else it is broken: `main` already declares $version, so the tagged
-          # commit was supposed to have landed. It never will if the PR was squash- or
-          # rebase-merged — both rewrite the commit — and failing here is the only signal
-          # that the release is stuck. Fix by moving the tag onto the commit on `main`.
-          git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
-          if ! git merge-base --is-ancestor "$sha" origin/main; then
-            if [ "${GITHUB_REF_TYPE:-}" = tag ]; then
-              echo "::notice::$tag ($(git rev-parse --short "$sha")) is not on main yet — it will publish when merged"
-              exit 0
-            fi
-            echo "::error::main is at $version but $tag points at $(git rev-parse --short "$sha"), which is not on main (squash or rebase merge?) — move the tag to the release commit on main"
-            exit 1
-          fi
-
-          # Publishing is not idempotent: a second attempt at an existing version fails with
-          # EPUBLISHCONFLICT. That is reached routinely here — every later push to `main`
-          # re-examines the same tag — and is a no-op, not a failure.
-          if published; then
+          # `npm view` exits nonzero both for a version that does not exist and for a registry
+          # it could not reach. Only E404 means "not published"; treating an outage the same
+          # way would attempt a publish on every push to `main` while npm is down.
+          if out="$(npm view "buildgql@$version" version 2>&1)" && [ -n "$out" ]; then
             echo "::notice::buildgql@$version is already published"
             exit 0
           fi
+          if ! grep -q E404 <<<"$out"; then
+            echo "::error::could not ask npm whether buildgql@$version exists:"
+            echo "$out"
+            exit 1
+          fi
 
-          echo "::notice::releasing buildgql@$version from $(git rev-parse --short "$sha")"
+          # Checked BEFORE publishing, because the tag step runs after it: a stale tag found
+          # only then would leave a published version with no tag, or a tag on the wrong code.
+          if existing="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")" \
+              && [ "$existing" != "$GITHUB_SHA" ]; then
+            echo "::error::$tag already exists on $(git rev-parse --short "$existing"), not on this commit — delete it so the release can tag $(git rev-parse --short "$GITHUB_SHA")"
+            exit 1
+          fi
+
+          echo "::notice::releasing buildgql@$version from $(git rev-parse --short "$GITHUB_SHA")"
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
-  # Runs on EVERY trigger, publishing or not, so this workflow goes red whenever the code it
-  # would release is broken — rather than reporting success because there was simply
-  # nothing to publish. Outside `production` for the same reason `gate` is.
+  # Runs on EVERY push, publishing or not, so this workflow goes red whenever `main` is broken
+  # rather than reporting success because there was simply nothing to publish. Outside
+  # `production` for the same reason `gate` is.
   verify:
     needs: gate
     runs-on: ubuntu-latest
@@ -156,10 +92,6 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The commit `publish` would ship when there is one; otherwise whatever this run
-          # was triggered on.
-          ref: ${{ needs.gate.outputs.sha || github.sha }}
 
       - uses: actions/setup-node@v4
         with:
@@ -169,8 +101,6 @@ jobs:
       - run: npm ci
 
       - name: Lint, format, types, tests, type-perf budget
-        # The same gate CI runs on every PR. Repeated here rather than trusted from the merge
-        # commit: a tag can be pushed to any commit, including one CI never saw.
         run: npm run check
 
       - name: The built binary actually runs
@@ -183,10 +113,8 @@ jobs:
     runs-on: ubuntu-latest
     # Entering `production` is what subjects this job to that environment's protection rules —
     # required reviewers, wait timers, and the deployment ref rules. Those live in the
-    # repository settings, not here; this line is the whole of the opt-in.
-    #
-    # The environment's ref rule must permit TAGS (`v*`) as well as `main`, since this job
-    # runs under both triggers. It is not where "only from main" is enforced — see `gate`.
+    # repository settings, not here; this line is the whole of the opt-in. The ref rule only
+    # needs to allow `main`.
     #
     # `url` is cosmetic: it turns the environment badge in the Actions UI into a link to what
     # was published.
@@ -202,11 +130,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The TAGGED commit, resolved by `gate`, rather than whatever `main` points at now:
-          # a merge landing between the two jobs would otherwise be published under a tag that
-          # does not contain it.
-          ref: ${{ needs.gate.outputs.sha }}
+        # No `ref`: the default is the commit that triggered this run, which `verify` checked —
+        # not whatever `main` points at by now.
 
       - uses: actions/setup-node@v4
         with:
@@ -245,3 +170,24 @@ jobs:
         # `prepack` rebuilds `dist` as part of `npm publish`, so the tarball is always built
         # from this checkout — `dist` is gitignored and never comes from the repository.
         run: npm publish --access public
+
+  # A job of its own so that write access to the repository is never held by a job that runs
+  # `npm ci` — every dependency's install script would run with that token in reach.
+  tag:
+    needs: [gate, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Tag the published commit
+        shell: bash
+        env:
+          TAG: v${{ needs.gate.outputs.version }}
+        run: |
+          set -euo pipefail
+          # `gate` already refused a tag on a different commit, so an existing one here is
+          # this commit's own — a retried run — and pushing it again is a no-op.
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
