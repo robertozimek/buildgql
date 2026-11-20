@@ -10,7 +10,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # 22, the floor for the dev toolchain (tsup 9 needs Node >= 22.18, vitest 5
+          # >= 22.12), not the runtime floor in `engines`. The `node18` build target is what
+          # keeps the published output loadable on older Node.
+          node-version: 22
           cache: npm
       - run: npm ci
       - run: npm run check

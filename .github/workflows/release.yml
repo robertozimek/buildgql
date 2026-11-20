@@ -8,6 +8,14 @@ name: Release
 # unmerged commit and does nothing, and the later push to `main` publishes. Tag a commit
 # already on `main` (what `npm version && git push --follow-tags` does) and the tag push
 # publishes immediately. Neither case is an error, because neither is a mistake.
+#
+# What IS an error fails the run, so a red Release means something needs a human:
+#   - the code at the commit being released (or at `main`) does not pass `npm run check`
+#   - `main` declares a version npm does not have, with no tag to release it from — a
+#     version bump merged without its tag, which would otherwise never publish
+#   - on `main`, a tag for the current version that is not on `main` — typically a
+#     tag-first PR that was squash- or rebase-merged, so the tagged commit never lands
+#   - the registry cannot be asked whether the version exists
 on:
   push:
     tags: ['v*']
@@ -44,16 +52,38 @@ jobs:
       - name: Is there a releasable tag on main that npm does not have?
         id: decide
         shell: bash
+        env:
+          # Through the environment, never `${{ }}` inside the script: a dispatch input is
+          # free text, and interpolating it would splice it into the shell source.
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           set -euo pipefail
           version="$(node -p "require('./package.json').version")"
           tag="v$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
+          # Is $version on npm? Answers yes or no, and FAILS the run when the registry cannot
+          # be asked. `npm view` prints nothing and exits nonzero both for a version that
+          # does not exist and for a registry it could not reach; only E404 is the answer
+          # "no", and treating an outage as "no" would make every check below lie.
+          published() {
+            local out
+            if out="$(npm view "buildgql@$version" version 2>&1)"; then
+              [ -n "$out" ]
+              return
+            fi
+            if grep -q E404 <<<"$out"; then
+              return 1
+            fi
+            echo "::error::could not ask npm whether buildgql@$version exists:"
+            echo "$out"
+            exit 1
+          }
+
           # A tag this run was explicitly pointed at, if any: the pushed tag, or the one
           # `workflow_dispatch` names. A push to `main` has neither, and asks the general
           # question instead.
-          requested="${{ github.event.inputs.tag }}"
+          requested="$INPUT_TAG"
           if [ -z "$requested" ] && [ "${GITHUB_REF_TYPE:-}" = tag ]; then
             requested="$GITHUB_REF_NAME"
           fi
@@ -67,9 +97,16 @@ jobs:
             exit 1
           fi
 
+          # No tag is only fine when the version is already out. Otherwise `main` carries a
+          # version bump that nothing will ever publish, which is exactly the kind of quiet
+          # breakage this run exists to surface. Pushing the tag fixes it (and publishes).
           if ! git rev-parse -q --verify "refs/tags/$tag^{commit}" >/dev/null; then
-            echo "::notice::no $tag tag yet — nothing to release"
-            exit 0
+            if published; then
+              echo "::notice::buildgql@$version is already published"
+              exit 0
+            fi
+            echo "::error::package.json is at $version, which npm does not have, and there is no $tag tag to release it from — push the tag to publish"
+            exit 1
           fi
           sha="$(git rev-parse "refs/tags/$tag^{commit}")"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
@@ -80,21 +117,28 @@ jobs:
           # `github.ref` is `refs/tags/v0.1.0` and there is no branch to match. Ancestry is
           # the question that actually has an answer.
           #
-          # Not reachable is the ordinary "tagged on a branch, not merged yet" case, so it
-          # ends this run quietly. The push to `main` that merges it runs this same check
-          # again and publishes then.
+          # On a TAG push, not reachable is the ordinary "tagged on a branch, not merged yet"
+          # case, so it ends this run quietly. The push to `main` that merges it runs this
+          # same check again and publishes then.
+          #
+          # Anywhere else it is broken: `main` already declares $version, so the tagged
+          # commit was supposed to have landed. It never will if the PR was squash- or
+          # rebase-merged — both rewrite the commit — and failing here is the only signal
+          # that the release is stuck. Fix by moving the tag onto the commit on `main`.
           git fetch --no-tags --quiet origin +refs/heads/main:refs/remotes/origin/main
           if ! git merge-base --is-ancestor "$sha" origin/main; then
-            echo "::notice::$tag ($(git rev-parse --short "$sha")) is not on main yet — it will publish when merged"
-            exit 0
+            if [ "${GITHUB_REF_TYPE:-}" = tag ]; then
+              echo "::notice::$tag ($(git rev-parse --short "$sha")) is not on main yet — it will publish when merged"
+              exit 0
+            fi
+            echo "::error::main is at $version but $tag points at $(git rev-parse --short "$sha"), which is not on main (squash or rebase merge?) — move the tag to the release commit on main"
+            exit 1
           fi
 
           # Publishing is not idempotent: a second attempt at an existing version fails with
           # EPUBLISHCONFLICT. That is reached routinely here — every later push to `main`
-          # re-examines the same tag — and is a no-op, not a failure. `npm view` exits nonzero
-          # for an unpublished version, which is the answer rather than an error, hence the
-          # test on its output instead of its status.
-          if [ -n "$(npm view "buildgql@$version" version 2>/dev/null || true)" ]; then
+          # re-examines the same tag — and is a no-op, not a failure.
+          if published; then
             echo "::notice::buildgql@$version is already published"
             exit 0
           fi
@@ -102,8 +146,39 @@ jobs:
           echo "::notice::releasing buildgql@$version from $(git rev-parse --short "$sha")"
           echo "publish=true" >> "$GITHUB_OUTPUT"
 
-  publish:
+  # Runs on EVERY trigger, publishing or not, so this workflow goes red whenever the code it
+  # would release is broken — rather than reporting success because there was simply
+  # nothing to publish. Outside `production` for the same reason `gate` is.
+  verify:
     needs: gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The commit `publish` would ship when there is one; otherwise whatever this run
+          # was triggered on.
+          ref: ${{ needs.gate.outputs.sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint, format, types, tests, type-perf budget
+        # The same gate CI runs on every PR. Repeated here rather than trusted from the merge
+        # commit: a tag can be pushed to any commit, including one CI never saw.
+        run: npm run check
+
+      - name: The built binary actually runs
+        shell: bash
+        run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
+
+  publish:
+    needs: [gate, verify]
     if: needs.gate.outputs.publish == 'true'
     runs-on: ubuntu-latest
     # Entering `production` is what subjects this job to that environment's protection rules —
@@ -135,9 +210,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          # 22, not the 20 that ci.yml checks against, because trusted publishing needs
-          # Node >= 22.14. The gate below therefore runs on a newer Node than CI does; that is
-          # the point of running it here at all, and `engines` still declares >= 18.
+          # 22: trusted publishing needs Node >= 22.14, and the dev toolchain (tsup 9) needs
+          # >= 22.18 to build. `engines` still declares >= 18 for the published output.
           #
           # No `registry-url`: it exists to write an .npmrc containing
           # `_authToken=${NODE_AUTH_TOKEN}`, and there is no token here to write.
@@ -150,16 +224,9 @@ jobs:
         # fails with an auth error that says nothing about the real cause.
         run: npm install --global npm@latest
 
+      # No `npm run check` here: `verify` already ran it against this exact commit, and this
+      # job does not start unless it passed.
       - run: npm ci
-
-      - name: Lint, format, types, tests, type-perf budget
-        # The same gate CI runs on every PR. Repeated here rather than trusted from the merge
-        # commit: a tag can be pushed to any commit, including one CI never saw.
-        run: npm run check
-
-      - name: The built binary actually runs
-        shell: bash
-        run: node dist/cli/bin.js --help | grep -q 'type-safe GraphQL query builder codegen'
 
       - name: Publish to npm
         # Authenticated by TRUSTED PUBLISHING: npm exchanges this job's OIDC token for a
