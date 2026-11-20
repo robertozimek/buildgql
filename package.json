@@ -1,6 +1,6 @@
 {
   "name": "buildgql",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Type-safe GraphQL query builder generated from introspection",
   "license": "MIT",
   "type": "module",
